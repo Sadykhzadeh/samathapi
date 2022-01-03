@@ -1,0 +1,29 @@
+{
+  "name": "samathgen-api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node .",
+    "dev": "nodemon ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sadykhzadeh/samathgen-api.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Sadykhzadeh/samathgen-api/issues"
+  },
+  "homepage": "https://github.com/Sadykhzadeh/samathgen-api#readme",
+  "dependencies": {
+    "express": "^4.17.2",
+    "samathgen": "^0.1.1"
+  },
+  "type": "module",
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}
