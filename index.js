@@ -8,16 +8,19 @@ app.get('/', (req, res) => {
 })
 
 app.get('/gen', (req, res) => {
+  const isCLI = req.query.c;
   const length = req.query?.length;
   const answer = req.query?.answer;
   const brackets = req.query?.brackets;
   const options = req.query?.options;
   if (!length) res.status(500);
-  res.send(mathGen(length, {
+  const result = mathGen(length, {
     "answer": answer,
     "brackets": brackets,
     "quizOptions": options
-  }))
+  })
+  if (isCLI) res.send(`${result.task.join("")} ${result.answer} ${result.quizOptions.join(",")}`);
+  else res.send(result);
 })
 
 app.listen(port)
