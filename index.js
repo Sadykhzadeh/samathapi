@@ -19,7 +19,7 @@ app.get('/gen', (req, res) => {
     "brackets": brackets,
     "quizOptions": options
   })
-  if (isCLI) res.send(`${result.task.join("")} ${result.answer} ${result.quizOptions.join(",")}`);
+  if (isCLI) res.send(`${result.task.join("")} ${result.quizOptions.join(",")} ${result.answer}`);
   else res.send(result);
 })
 
