@@ -1,5 +1,6 @@
 import express from 'express';
 import { mathGen } from 'samathgen';
+
 const app = express()
 const port = 3000
 
@@ -15,7 +16,8 @@ const genNumber = (first, second) => {
 app.get('/gen', (req, res) => {
   const isCLI = req.query.c;
   const result = mathGen(genNumber(process.env.lengthFrom || 2, process.env.lengthTo || 4), {
-    "brackets": process.env.brackets || false
+    "brackets": process.env.brackets || false,
+    "quizMode": true
   })
   if (isCLI) res.send(`${result.task.join("")} ${result.quizOptions.join(",")} ${result.answer}`);
   else res.send(result);
