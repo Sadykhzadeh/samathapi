@@ -7,17 +7,15 @@ app.get('/', (req, res) => {
   res.send('Hello World')
 })
 
+const genNumber = (first, second) => {
+  [first, second] = [Math.min(first, second), Math.max(second, first)];
+  return first + Math.floor(Math.random() * (second - first + 1));
+};
+
 app.get('/gen', (req, res) => {
   const isCLI = req.query.c;
-  const length = req.query?.length;
-  const answer = req.query?.answer;
-  const brackets = req.query?.brackets;
-  const options = req.query?.options;
-  if (!length) res.status(500);
-  const result = mathGen(length, {
-    "answer": answer,
-    "brackets": brackets,
-    "quizOptions": options
+  const result = mathGen(genNumber(process.env.lengthFrom || 2, process.env.lengthTo || 4), {
+    "brackets": process.env.brackets || false
   })
   if (isCLI) res.send(`${result.task.join("")} ${result.quizOptions.join(",")} ${result.answer}`);
   else res.send(result);
