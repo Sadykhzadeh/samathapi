@@ -1,1 +1,1 @@
-# samathgen-api
+# samathapi
