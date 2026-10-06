@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: start the server
+        run: |
+          PORT=3000 node . &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/healthz && break
+            sleep 1
+          done
+      - name: the CLI format is "<task> <four options> <answer>"
+        run: |
+          body=$(curl -sf "http://127.0.0.1:3000/gen?c=true")
+          echo "$body"
+          echo "$body" | grep -Eq '^[-0-9()*/+]+ -?[0-9]+(,-?[0-9]+){3} -?[0-9]+$'
+      - name: c=false must not return the CLI format
+        run: |
+          curl -sf "http://127.0.0.1:3000/gen?c=false" | grep -q '"answer"'
