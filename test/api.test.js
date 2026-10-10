@@ -1,6 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApp, readConfig } from '../app.js';
+import { mathGen } from 'samathgen';
+import { createApp, drawSound, readConfig } from '../app.js';
+import { evaluate } from '../evaluate.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", which SaMathCLI splits on
 // spaces and commas.
@@ -74,6 +76,48 @@ test('a generator that throws is a plain 500, not a stack trace', async (t) => {
     assert.equal(await res.text(), 'could not generate a task');
   } finally {
     failing.server.close();
+  }
+});
+
+test('every task served works out to its answer', () => {
+  // samathgen 0.1.3 gets about 3% of these wrong on its own, and writes
+  // another few percent as "3*-1*3+20".
+  for (const brackets of [false, true]) {
+    for (let i = 0; i < 20000; i++) {
+      const { task, answer, quizOptions } = drawSound(mathGen, 2 + (i % 3), { brackets, quizMode: true });
+      const text = task.join('');
+      assert.equal(evaluate(text), answer, `${text} served as ${answer}`);
+      assert.ok(quizOptions.includes(answer));
+    }
+  }
+});
+
+test('a wrong task is drawn again rather than served', async () => {
+  const tasks = [
+    { task: [7, '*', 2, '-', 1, '*', 2], answer: 14, quizOptions: [14, 12, 13, 15] },
+    { task: [3, '*', -1, '+', 20], answer: 17, quizOptions: [17, 12, 13, 15] },
+    { task: [2, '+', 3], answer: 5, quizOptions: [1, 2, 3, 4] },
+    { task: [2, '+', 3], answer: 5, quizOptions: [5, 2, 3, 4] },
+  ];
+  let call = 0;
+  const app = await listen(createApp(readConfig({}), () => tasks[call++]));
+  try {
+    assert.equal(await (await fetch(`${app.base}/gen?c=true`)).text(), '2+3 5,2,3,4 5');
+    assert.equal(call, 4);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a generator that never gets it right is a 500, not a wrong task', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const wrong = { task: [2, '+', 2], answer: 5, quizOptions: [5, 4, 3, 2] };
+  const app = await listen(createApp(readConfig({}), () => wrong));
+  try {
+    const res = await fetch(`${app.base}/gen?c=true`);
+    assert.equal(res.status, 500);
+  } finally {
+    app.server.close();
   }
 });
 

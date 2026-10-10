@@ -36,6 +36,13 @@ nothing extra to install.
 Only the exact string `true` turns `c` on; anything else, `false` included,
 returns JSON.
 
+Every task is checked before it is served: it has to work out to its answer
+with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
+its own only at the start or just inside a bracket, and its options have to
+include the answer. A task that fails is drawn again. The samathgen release
+on npm (0.1.3) gets about 3% of its tasks wrong and writes another few
+percent as `3*-1*3+20`; none of those reach a client.
+
 ## Configuration
 
 Read from the environment, or from a `.env` file. Any value that is not a
