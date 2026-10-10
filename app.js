@@ -54,6 +54,32 @@ export const drawSound = (generate, length, options) => {
   return null;
 };
 
+// A request may ask for its own length and brackets, within the same bounds
+// as the config. A value that is given but unusable is a 400 naming it, not
+// a quiet fallback: a client that asked for 20 terms should hear that it
+// cannot have them.
+const readRequest = (query, config) => {
+  const { length, brackets } = query;
+  const request = {
+    length: genNumber(config.lengthFrom, config.lengthTo),
+    brackets: config.brackets,
+  };
+  if (length !== undefined) {
+    const parsed = typeof length === 'string' && /^[0-9]+$/.test(length) ? Number(length) : NaN;
+    if (!(parsed >= LENGTH_MIN && parsed <= LENGTH_MAX)) {
+      return { error: `length must be a whole number from ${LENGTH_MIN} to ${LENGTH_MAX}` };
+    }
+    request.length = parsed;
+  }
+  if (brackets !== undefined) {
+    if (brackets !== 'true' && brackets !== 'false') {
+      return { error: 'brackets must be true or false' };
+    }
+    request.brackets = brackets === 'true';
+  }
+  return request;
+};
+
 // `generate` is mathGen unless a test hands in something else.
 export const createApp = (config, generate = mathGen) => {
   const app = express();
@@ -70,10 +96,17 @@ export const createApp = (config, generate = mathGen) => {
     // `req.query.c` was used as it came, so ?c=false asked for the CLI format
     // just as readily as ?c=true.
     const isCLI = flag(req.query.c);
+    const request = readRequest(req.query, config);
+    if (request.error) {
+      res.status(400);
+      if (isCLI) res.type('text/plain').send(request.error);
+      else res.json({ error: request.error });
+      return;
+    }
     let result;
     try {
-      result = drawSound(generate, genNumber(config.lengthFrom, config.lengthTo), {
-        brackets: config.brackets,
+      result = drawSound(generate, request.length, {
+        brackets: request.brackets,
         quizMode: true,
       });
       if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
