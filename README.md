@@ -36,6 +36,22 @@ nothing extra to install.
 Only the exact string `true` turns `c` on; anything else, `false` included,
 returns JSON.
 
+`/gen` also takes:
+
+| Parameter | Values | Default |
+| --- | --- | --- |
+| `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
+| `brackets` | `true` or `false` | the `brackets` setting |
+
+```sh
+curl 'http://localhost:3000/gen?length=6&brackets=true'
+```
+
+A value outside those is answered with `400` and the reason, as
+`{"error":"length must be a whole number from 2 to 12"}`, or as the bare
+message with `c=true`. With `brackets=true`, samathgen 0.1.3 puts one or two
+more numbers inside the bracket than `length` asks for.
+
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
 its own only at the start or just inside a bracket, and its options have to

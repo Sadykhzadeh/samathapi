@@ -136,6 +136,68 @@ test('the configured length range is what the generator is asked for', async () 
   assert.deepEqual([...new Set(asked)].sort(), [3, 4, 5]);
 });
 
+const spyApp = async (env = {}) => {
+  const asked = [];
+  const spy = (length, options) => {
+    asked.push({ length, brackets: options.brackets });
+    return { task: [1, '+', 1], answer: 2, quizOptions: [1, 2, 3, 4] };
+  };
+  return { ...(await listen(createApp(readConfig(env), spy))), asked };
+};
+
+test('a request can ask for its own length and brackets', async () => {
+  const app = await spyApp({ lengthFrom: '2', lengthTo: '3' });
+  try {
+    for (const [query, expected] of [
+      ['length=7', { length: 7, brackets: false }],
+      ['length=12&brackets=true', { length: 12, brackets: true }],
+      ['length=2&brackets=false&c=true', { length: 2, brackets: false }],
+    ]) {
+      const res = await fetch(`${app.base}/gen?${query}`);
+      assert.equal(res.status, 200, query);
+      await res.text();
+      assert.deepEqual(app.asked.pop(), expected, query);
+    }
+  } finally {
+    app.server.close();
+  }
+});
+
+test('brackets in the request overrides the config both ways', async () => {
+  const app = await spyApp({ brackets: 'true' });
+  try {
+    await (await fetch(`${app.base}/gen?brackets=false`)).text();
+    assert.equal(app.asked.pop().brackets, false);
+    await (await fetch(`${app.base}/gen`)).text();
+    assert.equal(app.asked.pop().brackets, true);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a length or brackets it cannot honour is a 400 that says why', async () => {
+  const app = await spyApp();
+  try {
+    for (const query of ['length=1', 'length=13', 'length=4.5', 'length=abc', 'length=', 'length=3&length=4', 'length=-3']) {
+      const res = await fetch(`${app.base}/gen?${query}`);
+      assert.equal(res.status, 400, query);
+      assert.deepEqual(await res.json(), { error: 'length must be a whole number from 2 to 12' }, query);
+    }
+    for (const query of ['brackets=yes', 'brackets=1', 'brackets=TRUE']) {
+      const res = await fetch(`${app.base}/gen?${query}`);
+      assert.equal(res.status, 400, query);
+      assert.deepEqual(await res.json(), { error: 'brackets must be true or false' }, query);
+    }
+    const res = await fetch(`${app.base}/gen?c=true&length=40`);
+    assert.equal(res.status, 400);
+    assert.match(res.headers.get('content-type'), /^text\/plain/);
+    assert.equal(await res.text(), 'length must be a whole number from 2 to 12');
+    assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
+  } finally {
+    app.server.close();
+  }
+});
+
 test('readConfig falls back on anything that is not a whole number', () => {
   assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, port: 3000 });
   assert.deepEqual(
