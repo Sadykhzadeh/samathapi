@@ -21,6 +21,9 @@ cp .sample.env .env   # optional
 npm start
 ```
 
+`npm test` runs the endpoint tests with Node's built-in runner; there is
+nothing extra to install.
+
 ## Endpoints
 
 | Endpoint | Returns |

@@ -4,7 +4,8 @@
   "description": "A bridge between SaMathGen and SaMathCLI",
   "main": "index.js",
   "scripts": {
-    "start": "node ."
+    "start": "node .",
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
