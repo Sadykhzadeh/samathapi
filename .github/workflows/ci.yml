@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: start the server
+        run: |
+          PORT=3000 node . &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/healthz && break
+            sleep 1
+          done
+      - name: the CLI format is "<task> <four options> <answer>"
+        run: |
+          body=$(curl -sf "http://127.0.0.1:3000/gen?c=true")
+          echo "$body"
+          echo "$body" | grep -Eq '^[-0-9()*/+]+ -?[0-9]+(,-?[0-9]+){3} -?[0-9]+$'
+      - name: count=5 is five CLI lines, which is how SaMathCLI fetches a quiz
+        run: |
+          test "$(curl -sf 'http://127.0.0.1:3000/gen?c=true&count=5' | wc -l)" = 5
+      - name: c=false must not return the CLI format
+        run: |
+          curl -sf "http://127.0.0.1:3000/gen?c=false" | grep -q '"answer"'
