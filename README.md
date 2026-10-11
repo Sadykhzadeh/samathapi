@@ -42,6 +42,7 @@ returns JSON.
 | --- | --- | --- |
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
 | `brackets` | `true` or `false` | the `brackets` setting |
+| `count` | how many tasks, `1` to `100` | one task |
 
 ```sh
 curl 'http://localhost:3000/gen?length=6&brackets=true'
@@ -51,6 +52,26 @@ A value outside those is answered with `400` and the reason, as
 `{"error":"length must be a whole number from 2 to 12"}`, or as the bare
 message with `c=true`. With `brackets=true`, samathgen 0.1.3 puts one or two
 more numbers inside the bracket than `length` asks for.
+
+### Many tasks in one request
+
+With `count` the answer is a list: a JSON array of the same objects `/gen`
+returns for one task, or with `c=true` one line per task, each ending in a
+newline. A client that wants a whole quiz asks once instead of once per
+question; fetching 20 questions with `curl` took 62 ms as 20 requests and
+5 ms as one, against a server on the same machine, and over a real network
+the saving is 19 round trips on top of that.
+
+```sh
+curl 'http://localhost:3000/gen?c=true&count=3'
+# 17-2 17,13,15,12 15
+# 12-1-1 12,8,13,10 10
+# 1*3*19/3 21,19,16,17 19
+```
+
+Without a `length`, every task draws its own from the configured range. The
+list shape follows the parameter and not the number: `count=1` is a list of
+one.
 
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of

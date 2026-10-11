@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mathGen } from 'samathgen';
-import { createApp, drawSound, readConfig } from '../app.js';
+import { COUNT_MAX, createApp, drawSound, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", which SaMathCLI splits on
@@ -192,6 +192,61 @@ test('a length or brackets it cannot honour is a 400 that says why', async () =>
     assert.equal(res.status, 400);
     assert.match(res.headers.get('content-type'), /^text\/plain/);
     assert.equal(await res.text(), 'length must be a whole number from 2 to 12');
+    assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('count asks for a whole quiz in one request', async () => {
+  for (const count of [1, 2, 20, COUNT_MAX]) {
+    const res = await fetch(`${base}/gen?count=${count}`);
+    assert.equal(res.status, 200, `count=${count}`);
+    assert.match(res.headers.get('content-type'), /^application\/json/);
+    const tasks = await res.json();
+    assert.equal(tasks.length, count);
+    for (const { task, answer, quizOptions } of tasks) {
+      assert.equal(evaluate(task.join('')), answer);
+      assert.equal(quizOptions.length, 4);
+      assert.ok(quizOptions.includes(answer));
+    }
+  }
+  assert.ok(!Array.isArray(await (await fetch(`${base}/gen`)).json()), 'without count it is one task');
+});
+
+test('count with c=true is one CLI line per task', async () => {
+  const res = await fetch(`${base}/gen?c=true&count=25`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^text\/plain/);
+  const body = await res.text();
+  assert.ok(body.endsWith('\n'), 'every line, the last one too, ends in a newline');
+  const lines = body.slice(0, -1).split('\n');
+  assert.equal(lines.length, 25);
+  for (const line of lines) assert.match(line, CLI_LINE);
+});
+
+test('each task of a count draws its own length unless the request fixes one', async () => {
+  const app = await spyApp({ lengthFrom: '2', lengthTo: '5' });
+  try {
+    await (await fetch(`${app.base}/gen?count=60`)).text();
+    assert.equal(app.asked.length, 60);
+    assert.deepEqual([...new Set(app.asked.map((a) => a.length))].sort(), [2, 3, 4, 5]);
+    app.asked.length = 0;
+    await (await fetch(`${app.base}/gen?count=10&length=6&brackets=true`)).text();
+    assert.deepEqual(app.asked, Array(10).fill({ length: 6, brackets: true }));
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a count it cannot honour is a 400 that says why', async () => {
+  const app = await spyApp();
+  try {
+    for (const query of ['count=0', `count=${COUNT_MAX + 1}`, 'count=-2', 'count=2.5', 'count=many', 'count=', 'count=3&count=4']) {
+      const res = await fetch(`${app.base}/gen?${query}`);
+      assert.equal(res.status, 400, query);
+      assert.deepEqual(await res.json(), { error: `count must be a whole number from 1 to ${COUNT_MAX}` }, query);
+    }
     assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
   } finally {
     app.server.close();
