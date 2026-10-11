@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mathGen } from 'samathgen';
-import { COUNT_MAX, createApp, drawSound, readConfig } from '../app.js';
+import { COUNT_MAX, SEED_MAX, createApp, drawSound, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", which SaMathCLI splits on
@@ -248,6 +248,69 @@ test('a count it cannot honour is a 400 that says why', async () => {
       assert.deepEqual(await res.json(), { error: `count must be a whole number from 1 to ${COUNT_MAX}` }, query);
     }
     assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('the same seed is the same quiz, in either format', async () => {
+  for (const query of ['seed=42', 'seed=42&length=5&brackets=true', 'seed=7&count=10', 'seed=0&c=true&count=10']) {
+    const first = await (await fetch(`${base}/gen?${query}`)).text();
+    for (let i = 0; i < 5; i++) {
+      assert.equal(await (await fetch(`${base}/gen?${query}`)).text(), first, query);
+    }
+  }
+});
+
+test('different seeds are different quizzes', async () => {
+  const seen = new Set();
+  for (let seed = 0; seed < 30; seed++) {
+    seen.add(await (await fetch(`${base}/gen?c=true&length=6&seed=${seed}`)).text());
+  }
+  assert.ok(seen.size > 25, `${seen.size} different tasks out of 30 seeds`);
+});
+
+test('task i of a count is the task for seed + i, and the seed wraps at 32 bits', async () => {
+  const batch = await (await fetch(`${base}/gen?seed=100&count=6`)).json();
+  for (let i = 0; i < 6; i++) {
+    const single = await (await fetch(`${base}/gen?seed=${100 + i}`)).json();
+    assert.deepEqual(batch[i], single, `task ${i}`);
+  }
+  const wrapped = await (await fetch(`${base}/gen?seed=${SEED_MAX}&count=2`)).json();
+  assert.deepEqual(wrapped[1], await (await fetch(`${base}/gen?seed=0`)).json());
+});
+
+test('a seeded task is still checked, and Math.random is handed back', async (t) => {
+  const real = Math.random;
+  for (let seed = 0; seed < 120; seed++) {
+    const { task, answer, quizOptions } = await (await fetch(`${base}/gen?seed=${seed}&length=${2 + (seed % 5)}`)).json();
+    assert.equal(evaluate(task.join('')), answer, `seed ${seed}`);
+    assert.ok(quizOptions.includes(answer));
+  }
+  assert.equal(Math.random, real);
+
+  t.mock.method(console, 'error', () => {});
+  const failing = await listen(createApp(readConfig({}), () => {
+    throw new Error('boom');
+  }));
+  try {
+    assert.equal((await fetch(`${failing.base}/gen?seed=1`)).status, 500);
+  } finally {
+    failing.server.close();
+  }
+  assert.equal(Math.random, real, 'still the real one after the generator threw');
+});
+
+test('a seed it cannot honour is a 400 that says why', async () => {
+  const app = await spyApp();
+  try {
+    for (const query of ['seed=-1', `seed=${SEED_MAX + 1}`, 'seed=1.5', 'seed=abc', 'seed=', 'seed=1&seed=2']) {
+      const res = await fetch(`${app.base}/gen?${query}`);
+      assert.equal(res.status, 400, query);
+      assert.deepEqual(await res.json(), { error: `seed must be a whole number from 0 to ${SEED_MAX}` }, query);
+    }
+    assert.equal((await fetch(`${app.base}/gen?seed=${SEED_MAX}`)).status, 200);
+    assert.equal(app.asked.length, 1, 'only the valid request reached the generator');
   } finally {
     app.server.close();
   }

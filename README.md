@@ -43,6 +43,7 @@ returns JSON.
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
 | `brackets` | `true` or `false` | the `brackets` setting |
 | `count` | how many tasks, `1` to `100` | one task |
+| `seed` | a whole number from `0` to `4294967295` | none: every request is different |
 
 ```sh
 curl 'http://localhost:3000/gen?length=6&brackets=true'
@@ -72,6 +73,25 @@ curl 'http://localhost:3000/gen?c=true&count=3'
 Without a `length`, every task draws its own from the configured range. The
 list shape follows the parameter and not the number: `count=1` is a list of
 one.
+
+### The same quiz twice
+
+With a `seed` a request gives the same answer every time, so a teacher can
+hand a class one quiz and everyone's `?seed=2024` is the same set of
+questions. Task `i` of a `count` is exactly the task a request for
+`seed + i` gives, so a worksheet can be rerun, split or resumed from its seed,
+and after `4294967295` the seed wraps to `0`.
+
+```sh
+curl 'http://localhost:3000/gen?c=true&count=3&seed=2024'
+# -10+1*5*4 10,12,8,13 10
+# 8*4/2 13,17,18,16 16
+# 9-2+6 15,13,11,10 13
+```
+
+A seeded task goes through the same check as any other. What a seed gives is
+fixed for a given server and samathgen version; upgrading samathgen can change
+the quiz a seed names.
 
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
