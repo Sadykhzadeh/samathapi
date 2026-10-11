@@ -54,18 +54,23 @@ export const drawSound = (generate, length, options) => {
   return null;
 };
 
-// A request may ask for its own length and brackets, within the same bounds
-// as the config. A value that is given but unusable is a 400 naming it, not
-// a quiet fallback: a client that asked for 20 terms should hear that it
-// cannot have them.
+// How many tasks one request may ask for. A quiz is a few dozen questions at
+// most; past this a count from a query string stops being a quiz.
+export const COUNT_MAX = 100;
+
+const wholeNumber = (value) =>
+  typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : NaN;
+
+// A request may ask for its own length, brackets and count, within the same
+// bounds as the config. A value that is given but unusable is a 400 naming
+// it, not a quiet fallback: a client that asked for 20 terms should hear that
+// it cannot have them. Without a length each task draws its own from the
+// configured range.
 const readRequest = (query, config) => {
-  const { length, brackets } = query;
-  const request = {
-    length: genNumber(config.lengthFrom, config.lengthTo),
-    brackets: config.brackets,
-  };
+  const { length, brackets, count } = query;
+  const request = { length: undefined, brackets: config.brackets, count: undefined };
   if (length !== undefined) {
-    const parsed = typeof length === 'string' && /^[0-9]+$/.test(length) ? Number(length) : NaN;
+    const parsed = wholeNumber(length);
     if (!(parsed >= LENGTH_MIN && parsed <= LENGTH_MAX)) {
       return { error: `length must be a whole number from ${LENGTH_MIN} to ${LENGTH_MAX}` };
     }
@@ -77,8 +82,19 @@ const readRequest = (query, config) => {
     }
     request.brackets = brackets === 'true';
   }
+  if (count !== undefined) {
+    const parsed = wholeNumber(count);
+    if (!(parsed >= 1 && parsed <= COUNT_MAX)) {
+      return { error: `count must be a whole number from 1 to ${COUNT_MAX}` };
+    }
+    request.count = parsed;
+  }
   return request;
 };
+
+// "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", the line SaMathCLI parses.
+const cliLine = ({ task, answer, quizOptions }) =>
+  `${task.join('')} ${quizOptions.join(',')} ${answer}`;
 
 // `generate` is mathGen unless a test hands in something else.
 export const createApp = (config, generate = mathGen) => {
@@ -103,13 +119,17 @@ export const createApp = (config, generate = mathGen) => {
       else res.json({ error: request.error });
       return;
     }
-    let result;
+    const tasks = [];
     try {
-      result = drawSound(generate, request.length, {
-        brackets: request.brackets,
-        quizMode: true,
-      });
-      if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
+      for (let i = 0; i < (request.count ?? 1); i++) {
+        const result = drawSound(
+          generate,
+          request.length ?? genNumber(config.lengthFrom, config.lengthTo),
+          { brackets: request.brackets, quizMode: true },
+        );
+        if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
+        tasks.push(result);
+      }
     } catch (error) {
       // Nothing caught a throw from mathGen, so express replied with its own
       // stack-trace page instead.
@@ -118,8 +138,14 @@ export const createApp = (config, generate = mathGen) => {
       return;
     }
     // The CLI payload is plain text, but res.send labelled it text/html.
-    if (isCLI) res.type('text/plain').send(`${result.task.join('')} ${result.quizOptions.join(',')} ${result.answer}`);
-    else res.json(result);
+    if (request.count === undefined) {
+      if (isCLI) res.type('text/plain').send(cliLine(tasks[0]));
+      else res.json(tasks[0]);
+    } else if (isCLI) {
+      res.type('text/plain').send(`${tasks.map(cliLine).join('\n')}\n`);
+    } else {
+      res.json(tasks);
+    }
   });
 
   return app;

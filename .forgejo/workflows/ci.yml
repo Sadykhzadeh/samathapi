@@ -28,6 +28,9 @@ jobs:
           body=$(curl -sf "http://127.0.0.1:3000/gen?c=true")
           echo "$body"
           echo "$body" | grep -Eq '^[-0-9()*/+]+ -?[0-9]+(,-?[0-9]+){3} -?[0-9]+$'
+      - name: count=5 is five CLI lines, which is how SaMathCLI fetches a quiz
+        run: |
+          test "$(curl -sf 'http://127.0.0.1:3000/gen?c=true&count=5' | wc -l)" = 5
       - name: c=false must not return the CLI format
         run: |
           curl -sf "http://127.0.0.1:3000/gen?c=false" | grep -q '"answer"'
