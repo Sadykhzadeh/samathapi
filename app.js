@@ -2,16 +2,12 @@ import express from 'express';
 import { mathGen } from 'samathgen';
 import { evaluate } from './evaluate.js';
 
-// Everything in process.env is a string, and every non-empty string is truthy
-// - so `process.env.brackets || false` turned brackets on for `brackets=false`
-// as readily as for `brackets=true`. The only value that means yes is "true".
+// Env values are strings and every non-empty string is truthy, so only the
+// exact string "true" counts as yes.
 export const flag = (value) => value === 'true';
 
-// A length that is not a number used to pass straight through to mathGen,
-// which answered NaN > 2 with its shortest possible task - so a misspelt
-// lengthFrom was silently ignored. A large one was worse: lengthTo=400 built
-// a task several hundred characters long that collapsed into "*0*0*0...",
-// well past what a client such as SaMathCLI reads back.
+// Lengths are clamped: a very long task collapses into "*0*0*0..." and is
+// longer than a client such as SaMathCLI reads back.
 export const LENGTH_MIN = 2;
 export const LENGTH_MAX = 12;
 const toLength = (value, fallback) => {
@@ -147,8 +143,6 @@ export const createApp = (config, generate = mathGen) => {
   });
 
   app.get('/gen', (req, res) => {
-    // `req.query.c` was used as it came, so ?c=false asked for the CLI format
-    // just as readily as ?c=true.
     const isCLI = flag(req.query.c);
     const request = readRequest(req.query, config);
     if (request.error) {
@@ -173,13 +167,11 @@ export const createApp = (config, generate = mathGen) => {
         tasks.push(result);
       }
     } catch (error) {
-      // Nothing caught a throw from mathGen, so express replied with its own
-      // stack-trace page instead.
+      // keep the stack trace out of the reply
       console.error('mathGen failed:', error);
       res.status(500).type('text/plain').send('could not generate a task');
       return;
     }
-    // The CLI payload is plain text, but res.send labelled it text/html.
     if (request.count === undefined) {
       if (isCLI) res.type('text/plain').send(cliLine(tasks[0]));
       else res.json(tasks[0]);
