@@ -148,11 +148,16 @@ export const createApp = (config, generate = mathGen) => {
 
   app.get('/gen', (req, res) => {
     const isCLI = flag(req.query.c);
+    // An error comes in the format the request asked for, as the bare
+    // message for c=true and as {"error": "..."} otherwise.
+    const fail = (status, message) => {
+      res.status(status);
+      if (isCLI) res.type('text/plain').send(message);
+      else res.json({ error: message });
+    };
     const request = readRequest(req.query, config);
     if (request.error) {
-      res.status(400);
-      if (isCLI) res.type('text/plain').send(request.error);
-      else res.json({ error: request.error });
+      fail(400, request.error);
       return;
     }
     const tasks = [];
@@ -173,7 +178,7 @@ export const createApp = (config, generate = mathGen) => {
     } catch (error) {
       // keep the stack trace out of the reply
       console.error('mathGen failed:', error);
-      res.status(500).type('text/plain').send('could not generate a task');
+      fail(500, 'could not generate a task');
       return;
     }
     if (request.count === undefined) {

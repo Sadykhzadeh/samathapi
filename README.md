@@ -51,7 +51,8 @@ curl 'http://localhost:3000/gen?length=6&brackets=true'
 
 A value outside those is answered with `400` and the reason, as
 `{"error":"length must be a whole number from 2 to 12"}`, or as the bare
-message with `c=true`. With `brackets=true`, samathgen 0.1.3 puts one or two
+message with `c=true`. A task that cannot be generated is a `500` in the same
+two formats, with the message `could not generate a task`. With `brackets=true`, samathgen 0.1.3 puts one or two
 more numbers inside the bracket than `length` asks for.
 
 ### Many tasks in one request
