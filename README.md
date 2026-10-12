@@ -36,6 +36,24 @@ nothing extra to install.
 Only the exact string `true` turns `c` on; anything else, `false` included,
 returns JSON.
 
+### The task as JSON
+
+```sh
+curl 'http://localhost:3000/gen?brackets=true&seed=5'
+# {"task":[3,"*",9,"*",2,"/","(4-1)"],"answer":18,"quizOptions":[16,17,21,18]}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `3*9*2/(4-1)`. |
+| `answer` | What the task works out to, a whole number. |
+| `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. |
+
+Read the task by joining it rather than piece by piece: samathgen 0.1.3, which
+is what npm serves, sends a bracketed group as a single string such as
+`"(4-1)"`, where later versions send `"("` and `")"` on their own. A number
+can be negative, as `-10` in `-10+1*5*4`.
+
 `/gen` also takes:
 
 | Parameter | Values | Default |
