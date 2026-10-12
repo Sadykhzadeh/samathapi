@@ -341,6 +341,14 @@ test('readConfig falls back on anything that is not a whole number', () => {
   );
 });
 
+test('readConfig falls back on a PORT that is not a port', () => {
+  for (const PORT of ['0', '-1', '65536', '70000']) {
+    assert.equal(readConfig({ PORT }).port, 3000, PORT);
+  }
+  assert.equal(readConfig({ PORT: '1' }).port, 1);
+  assert.equal(readConfig({ PORT: '65535' }).port, 65535);
+});
+
 test('readConfig clamps lengths to 2..12 and reads brackets as a flag', () => {
   assert.deepEqual(
     readConfig({ lengthFrom: '0', lengthTo: '400', brackets: 'true', PORT: '8080' }),
