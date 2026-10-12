@@ -35,7 +35,11 @@ const genNumber = (first, second) => {
 // out to its answer by evaluate()'s rules and its options hold that answer;
 // anything else is drawn again. With the generator's own fix in place this
 // never redraws, and costs one parse per request.
-const ATTEMPTS = 20;
+//
+// The longer the task the more draws that takes: one in two is sound at 6
+// terms, one in ten at 12, where the worst of 100 000 tasks took 106 draws.
+// 200 leaves a 12-term task about one chance in five billion of a 500.
+const ATTEMPTS = 200;
 
 const isSound = ({ task, answer, quizOptions }) =>
   evaluate(task.join('')) === answer &&

@@ -92,6 +92,18 @@ test('every task served works out to its answer', () => {
   }
 });
 
+test('the longest tasks are served as surely as the shortest', async () => {
+  // samathgen 0.1.3 gets only about one 12-term task in ten right, so a
+  // whole quiz of them needs plenty of redraws.
+  for (const query of ['length=12', 'length=12&brackets=true', 'length=11', 'length=10']) {
+    const res = await fetch(`${base}/gen?c=true&count=${COUNT_MAX}&${query}`);
+    assert.equal(res.status, 200, query);
+    const lines = (await res.text()).slice(0, -1).split('\n');
+    assert.equal(lines.length, COUNT_MAX, query);
+    for (const line of lines) assert.match(line, CLI_LINE, query);
+  }
+});
+
 test('a wrong task is drawn again rather than served', async () => {
   const tasks = [
     { task: [7, '*', 2, '-', 1, '*', 2], answer: 14, quizOptions: [14, 12, 13, 15] },
