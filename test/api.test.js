@@ -65,7 +65,7 @@ test('only c=true asks for the CLI line', async () => {
   }
 });
 
-test('a generator that throws is a plain 500, not a stack trace', async (t) => {
+test('a generator that throws is a 500 in the format asked for, not a stack trace', async (t) => {
   t.mock.method(console, 'error', () => {});
   const failing = await listen(createApp(readConfig({}), () => {
     throw new Error('boom');
@@ -73,7 +73,12 @@ test('a generator that throws is a plain 500, not a stack trace', async (t) => {
   try {
     const res = await fetch(`${failing.base}/gen`);
     assert.equal(res.status, 500);
-    assert.equal(await res.text(), 'could not generate a task');
+    assert.match(res.headers.get('content-type'), /^application\/json/);
+    assert.deepEqual(await res.json(), { error: 'could not generate a task' });
+    const cli = await fetch(`${failing.base}/gen?c=true&count=3`);
+    assert.equal(cli.status, 500);
+    assert.match(cli.headers.get('content-type'), /^text\/plain/);
+    assert.equal(await cli.text(), 'could not generate a task');
   } finally {
     failing.server.close();
   }
