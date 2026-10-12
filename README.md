@@ -122,8 +122,9 @@ percent as `3*-1*3+20`; none of those reach a client.
 ## Configuration
 
 Read from the environment, or from a `.env` file. Any value that is not a
-whole number falls back to its default, and lengths are clamped to 2..12 so a
-stray setting cannot produce a task longer than a client will read.
+whole number falls back to its default, as does a `PORT` outside 1..65535,
+and lengths are clamped to 2..12 so a stray setting cannot produce a task
+longer than a client will read.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |

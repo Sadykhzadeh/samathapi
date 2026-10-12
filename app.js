@@ -16,11 +16,18 @@ const toLength = (value, fallback) => {
   return Math.min(Math.max(parsed, LENGTH_MIN), LENGTH_MAX);
 };
 
+// A number that is not a port would make listen() throw before the server
+// could say anything, so it falls back like any other unusable value.
+const toPort = (value) => {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return parsed >= 1 && parsed <= 65535 ? parsed : 3000;
+};
+
 export const readConfig = (env) => ({
   lengthFrom: toLength(env.lengthFrom, 2),
   lengthTo: toLength(env.lengthTo, 4),
   brackets: flag(env.brackets),
-  port: Number.parseInt(env.PORT ?? '', 10) || 3000,
+  port: toPort(env.PORT),
 });
 
 const genNumber = (first, second) => {
