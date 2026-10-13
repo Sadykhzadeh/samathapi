@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mathGen } from 'samathgen';
-import { COUNT_MAX, SEED_MAX, createApp, drawSound, readConfig } from '../app.js';
+import { COUNT_MAX, SEED_MAX, createApp, drawOptions, drawSound, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", which SaMathCLI splits on
@@ -113,16 +113,48 @@ test('a wrong task is drawn again rather than served', async () => {
   const tasks = [
     { task: [7, '*', 2, '-', 1, '*', 2], answer: 14, quizOptions: [14, 12, 13, 15] },
     { task: [3, '*', -1, '+', 20], answer: 17, quizOptions: [17, 12, 13, 15] },
-    { task: [2, '+', 3], answer: 5, quizOptions: [1, 2, 3, 4] },
     { task: [2, '+', 3], answer: 5, quizOptions: [5, 2, 3, 4] },
   ];
   let call = 0;
   const app = await listen(createApp(readConfig({}), () => tasks[call++]));
   try {
-    assert.equal(await (await fetch(`${app.base}/gen?c=true`)).text(), '2+3 5,2,3,4 5');
-    assert.equal(call, 4);
+    const line = await (await fetch(`${app.base}/gen?c=true`)).text();
+    assert.match(line, /^2\+3 -?[0-9]+(,-?[0-9]+){3} 5$/);
+    assert.equal(call, 3);
   } finally {
     app.server.close();
+  }
+});
+
+test('where the answer falls among the options gives nothing away', async () => {
+  // samathgen 0.1.3 never makes the answer the smallest or the largest of
+  // its options, so picking either middle one was right half the time.
+  const ranks = [0, 0, 0, 0];
+  for (let i = 0; i < 20; i++) {
+    for (const { answer, quizOptions } of await (await fetch(`${base}/gen?count=${COUNT_MAX}`)).json()) {
+      assert.equal(new Set(quizOptions).size, 4, `${quizOptions}`);
+      assert.ok(quizOptions.includes(answer), `${answer} not in ${quizOptions}`);
+      assert.ok(quizOptions.every((o) => Math.abs(o - answer) <= 5), `${quizOptions} for ${answer}`);
+      ranks[quizOptions.filter((o) => o < answer).length]++;
+    }
+  }
+  for (const count of ranks) assert.ok(Math.abs(count - 500) < 100, `ranks ${ranks}`);
+
+  // And for every shape the four can take, not only on average.
+  const byShape = new Map();
+  for (let i = 0; i < 40000; i++) {
+    const options = drawOptions(12);
+    const sorted = [...options].sort((a, b) => a - b);
+    const shape = sorted.map((o) => o - sorted[0]).join(',');
+    if (!byShape.has(shape)) byShape.set(shape, [0, 0, 0, 0]);
+    byShape.get(shape)[sorted.indexOf(12)]++;
+  }
+  assert.equal(byShape.size, 10);
+  for (const [shape, counts] of byShape) {
+    const expected = counts.reduce((a, b) => a + b) / 4;
+    for (const count of counts) {
+      assert.ok(Math.abs(count - expected) < expected * 0.2, `${shape}: ${counts}`);
+    }
   }
 });
 

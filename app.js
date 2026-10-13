@@ -39,19 +39,16 @@ const genNumber = (first, second) => {
 // wrong ("7*2-1*2" reported as 14) and writes another 3.6% in a notation
 // such as "-30+-41+88" or "3*-1*3+20". A pupil answering the first kind
 // is marked wrong for being right. So a task is only served once it works
-// out to its answer by evaluate()'s rules and its options hold that answer;
-// anything else is drawn again. With the generator's own fix in place this
-// never redraws, and costs one parse per request.
+// out to its answer by evaluate()'s rules; anything else is drawn again.
+// With the generator's own fix in place this never redraws, and costs one
+// parse per request.
 //
 // The longer the task the more draws that takes: one in two is sound at 6
 // terms, one in ten at 12, where the worst of 100 000 tasks took 106 draws.
 // 200 leaves a 12-term task about one chance in five billion of a 500.
 const ATTEMPTS = 200;
 
-const isSound = ({ task, answer, quizOptions }) =>
-  evaluate(task.join('')) === answer &&
-  quizOptions.length === 4 &&
-  quizOptions.includes(answer);
+const isSound = ({ task, answer }) => evaluate(task.join('')) === answer;
 
 export const drawSound = (generate, length, options) => {
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
@@ -59,6 +56,27 @@ export const drawSound = (generate, length, options) => {
     if (isSound(result)) return result;
   }
   return null;
+};
+
+const shuffle = (items) => {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+};
+
+// samathgen 0.1.3 offers the answer with one option 2 or 3 above it, one 2
+// or 3 below it and a fourth near it, so the answer is never the smallest
+// or the largest of the four and a pupil can rule out two of them without
+// working anything out. The options are drawn here instead: four of six
+// numbers in a row laid over the answer, whose rank among them is drawn
+// first, so it is as likely to be the smallest as the largest or either
+// between, whatever the four look like.
+export const drawOptions = (answer) => {
+  const rank = Math.floor(Math.random() * 4);
+  const pattern = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 4).sort((a, b) => a - b);
+  return shuffle(pattern.map((place) => answer + place - pattern[rank]));
 };
 
 // How many tasks one request may ask for. A quiz is a few dozen questions at
@@ -170,11 +188,16 @@ export const createApp = (config, generate = mathGen) => {
     const tasks = [];
     try {
       for (let i = 0; i < (request.count ?? 1); i++) {
-        const draw = () => drawSound(
-          generate,
-          request.length ?? genNumber(config.lengthFrom, config.lengthTo),
-          { brackets: request.brackets, quizMode: true },
-        );
+        // The generator is still asked for options of its own, which are
+        // replaced: the tasks a seed gives depend on every number it draws.
+        const draw = () => {
+          const result = drawSound(
+            generate,
+            request.length ?? genNumber(config.lengthFrom, config.lengthTo),
+            { brackets: request.brackets, quizMode: true },
+          );
+          return result && { ...result, quizOptions: drawOptions(result.answer) };
+        };
         // Task i of a count is the task a request for seed + i would give.
         const result = request.seed === undefined
           ? draw()

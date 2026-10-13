@@ -40,14 +40,14 @@ returns JSON.
 
 ```sh
 curl 'http://localhost:3000/gen?brackets=true&seed=5'
-# {"task":[3,"*",9,"*",2,"/","(4-1)"],"answer":18,"quizOptions":[16,17,21,18]}
+# {"task":[3,"*",9,"*",2,"/","(4-1)"],"answer":18,"quizOptions":[21,17,20,18]}
 ```
 
 | Field | Meaning |
 | --- | --- |
 | `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `3*9*2/(4-1)`. |
 | `answer` | What the task works out to, a whole number. |
-| `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. |
+| `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. They are four of six numbers in a row, and `answer` is as likely to be the smallest of them as the largest or either between, so a pupil cannot pick it by its size. |
 
 Read the task by joining it rather than piece by piece: samathgen 0.1.3, which
 is what npm serves, sends a bracketed group as a single string such as
@@ -84,9 +84,9 @@ the saving is 19 round trips on top of that.
 
 ```sh
 curl 'http://localhost:3000/gen?c=true&count=3'
-# 17-2 17,13,15,12 15
-# 12-1-1 12,8,13,10 10
-# 1*3*19/3 21,19,16,17 19
+# -2+3*5 13,18,16,14 13
+# 1*1*5+15 21,23,19,20 20
+# 5*4 15,19,17,20 20
 ```
 
 Without a `length`, every task draws its own from the configured range. The
@@ -103,9 +103,9 @@ and after `4294967295` the seed wraps to `0`.
 
 ```sh
 curl 'http://localhost:3000/gen?c=true&count=3&seed=2024'
-# -10+1*5*4 10,12,8,13 10
-# 8*4/2 13,17,18,16 16
-# 9-2+6 15,13,11,10 13
+# -10+1*5*4 12,9,11,10 10
+# 8*4/2 18,20,17,16 16
+# 9-2+6 12,17,15,13 13
 ```
 
 A seeded task goes through the same check as any other. What a seed gives is
@@ -114,10 +114,10 @@ the quiz a seed names.
 
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
-its own only at the start or just inside a bracket, and its options have to
-include the answer. A task that fails is drawn again. The samathgen release
-on npm (0.1.3) gets about 3% of its tasks wrong and writes another few
-percent as `3*-1*3+20`; none of those reach a client.
+its own only at the start or just inside a bracket. A task that fails is
+drawn again. The samathgen release on npm (0.1.3) gets about 3% of its tasks
+wrong and writes another few percent as `3*-1*3+20`; none of those reach a
+client.
 
 ## Configuration
 
