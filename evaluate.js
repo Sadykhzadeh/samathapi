@@ -3,9 +3,13 @@
 // not such a task, including a division that does not come out even - a
 // task that only works in fractions is not one a pupil can check.
 //
+// With negatives: false it is also NaN for a task with a number below zero
+// in it or anywhere along the way, as "2-5+15" is at 2-5: a pupil who has
+// not met negative numbers cannot work that out.
+//
 // Deliberately not eval(): the text comes from a dependency, and this file
 // is short enough to read in full.
-export const evaluate = (text) => {
+export const evaluate = (text, { negatives = true } = {}) => {
   let at = 0;
 
   const number = () => {
@@ -18,6 +22,7 @@ export const evaluate = (text) => {
     // A minus sign of its own only opens the task or a bracket, as in
     // "-3+5" or "7-(-5)". "2--1" and "3*-2" are refused, not read.
     if (text[at] === '-' && (at === 0 || text[at - 1] === '(')) {
+      if (!negatives) return NaN;
       at++;
       return -number();
     }
@@ -49,6 +54,7 @@ export const evaluate = (text) => {
       const operator = text[at++];
       const right = product();
       value = operator === '+' ? value + right : value - right;
+      if (!negatives && value < 0) return NaN;
     }
     return value;
   };

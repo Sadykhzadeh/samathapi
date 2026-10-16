@@ -27,6 +27,8 @@ export const readConfig = (env) => ({
   lengthFrom: toLength(env.lengthFrom, 2),
   lengthTo: toLength(env.lengthTo, 4),
   brackets: flag(env.brackets),
+  // On unless switched off, so only the exact string "false" counts as no.
+  negatives: env.negatives !== 'false',
   port: toPort(env.PORT),
 });
 
@@ -45,15 +47,18 @@ const genNumber = (first, second) => {
 //
 // The longer the task the more draws that takes: one in two is sound at 6
 // terms, one in ten at 12, where the worst of 100 000 tasks took 106 draws.
-// 200 leaves a 12-term task about one chance in five billion of a 500.
-const ATTEMPTS = 200;
+// Keeping negative numbers out as well makes it one in 19 at 12 terms with
+// brackets, worst 196. 500 leaves even that about one chance in 600 billion
+// of a 500.
+const ATTEMPTS = 500;
 
-const isSound = ({ task, answer }) => evaluate(task.join('')) === answer;
+const isSound = ({ task, answer }, negatives) =>
+  evaluate(task.join(''), { negatives }) === answer;
 
 export const drawSound = (generate, length, options) => {
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     const result = generate(length, options);
-    if (isSound(result)) return result;
+    if (isSound(result, options.negatives)) return result;
   }
   return null;
 };
@@ -157,16 +162,17 @@ const seeded = (seed, work) => {
   }
 };
 
-// A request may ask for its own length, brackets, count and seed, within the
-// same bounds as the config. A value that is given but unusable is a 400
-// naming it, not a quiet fallback: a client that asked for 20 terms should
-// hear that it cannot have them. Without a length each task draws its own
-// from the configured range.
+// A request may ask for its own length, brackets, negatives, count and seed,
+// within the same bounds as the config. A value that is given but unusable
+// is a 400 naming it, not a quiet fallback: a client that asked for 20 terms
+// should hear that it cannot have them. Without a length each task draws its
+// own from the configured range.
 const readRequest = (query, config) => {
-  const { length, brackets, count, seed } = query;
+  const { length, brackets, negatives, count, seed } = query;
   const request = {
     length: undefined,
     brackets: config.brackets,
+    negatives: config.negatives,
     count: undefined,
     seed: undefined,
   };
@@ -182,6 +188,12 @@ const readRequest = (query, config) => {
       return { error: 'brackets must be true or false' };
     }
     request.brackets = brackets === 'true';
+  }
+  if (negatives !== undefined) {
+    if (negatives !== 'true' && negatives !== 'false') {
+      return { error: 'negatives must be true or false' };
+    }
+    request.negatives = negatives === 'true';
   }
   if (count !== undefined) {
     const parsed = wholeNumber(count);
@@ -240,7 +252,7 @@ export const createApp = (config, generate = mathGen) => {
           const result = drawSound(
             generate,
             request.length ?? genNumber(config.lengthFrom, config.lengthTo),
-            { brackets: request.brackets, quizMode: true },
+            { brackets: request.brackets, negatives: request.negatives, quizMode: true },
           );
           return result && { ...result, quizOptions: drawOptions(result.answer) };
         };
