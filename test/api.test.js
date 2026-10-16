@@ -216,9 +216,12 @@ test('the configured length range is what the generator is asked for', async () 
 
 const spyApp = async (env = {}) => {
   const asked = [];
+  let calls = 0;
+  // A different task every call, so none of them is drawn again as a repeat.
   const spy = (length, options) => {
     asked.push({ length, brackets: options.brackets });
-    return { task: [1, '+', 1], answer: 2, quizOptions: [1, 2, 3, 4] };
+    calls++;
+    return { task: [calls, '+', 1], answer: calls + 1, quizOptions: [1, 2, 3, 4] };
   };
   return { ...(await listen(createApp(readConfig(env), spy))), asked };
 };
@@ -312,6 +315,41 @@ test('each task of a count draws its own length unless the request fixes one', a
     app.asked.length = 0;
     await (await fetch(`${app.base}/gen?count=10&length=6&brackets=true`)).text();
     assert.deepEqual(app.asked, Array(10).fill({ length: 6, brackets: true }));
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a quiz does not ask the same question twice', async () => {
+  // There are under 600 sound 2-term tasks and "39/3" alone is one in 65
+  // of them, so most 20-question quizzes of them would ask one twice.
+  for (const query of ['length=2&count=20', 'length=2&count=100', 'count=100']) {
+    for (let i = 0; i < 10; i++) {
+      const tasks = (await (await fetch(`${base}/gen?${query}`)).json()).map(({ task }) => task.join(''));
+      assert.equal(new Set(tasks).size, tasks.length, `${query}: ${tasks}`);
+    }
+  }
+
+  const drawn = [[2, '+', 3], [2, '+', 3], [4, '*', 4], [2, '+', 3], [4, '*', 4], [20, '-', 1]];
+  let call = 0;
+  const app = await listen(createApp(readConfig({}), () => {
+    const task = drawn[call++ % drawn.length];
+    return { task, answer: evaluate(task.join('')), quizOptions: [] };
+  }));
+  try {
+    const lines = (await (await fetch(`${app.base}/gen?c=true&count=3`)).text()).trim().split('\n');
+    assert.deepEqual(lines.map((line) => line.split(' ')[0]), ['2+3', '4*4', '20-1']);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a quiz with fewer tasks to give than it asks for repeats rather than fails', async () => {
+  const app = await listen(createApp(readConfig({}), () => ({ task: [2, '+', 3], answer: 5, quizOptions: [] })));
+  try {
+    const res = await fetch(`${app.base}/gen?count=3`);
+    assert.equal(res.status, 200);
+    assert.deepEqual((await res.json()).map(({ task }) => task.join('')), ['2+3', '2+3', '2+3']);
   } finally {
     app.server.close();
   }
