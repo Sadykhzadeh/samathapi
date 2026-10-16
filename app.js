@@ -73,7 +73,52 @@ const shuffle = (items) => {
 // numbers in a row laid over the answer, whose rank among them is drawn
 // first, so it is as likely to be the smallest as the largest or either
 // between, whatever the four look like.
+//
+// That alone still lets a pupil rule options out by size, because samathgen
+// gives every task an answer from 10 to 20 and a pupil who has done a few
+// quizzes knows it: of 6, 7, 8 and 10 only 10 can be right. So an answer in
+// that range draws its four from sets that stay inside it, each four numbers
+// that fit in six in a row, weighted so that the sets holding any one number
+// weigh 1 in all. A set then comes up as often for each of its four numbers,
+// and seeing it says nothing about which one is the answer. The weights
+// start as the number of places a set's shape fits in six in a row, which is
+// how often the window above gives it, and are scaled number by number until
+// every sum is 1; 200 rounds get there to the last bit.
+const ANSWER_MIN = 10;
+const ANSWER_MAX = 20;
+
+const optionSets = (() => {
+  const sets = [];
+  for (let low = ANSWER_MIN; low + 3 <= ANSWER_MAX; low++) {
+    for (let places = 1; places < 64; places += 2) {
+      const numbers = [0, 1, 2, 3, 4, 5]
+        .filter((place) => (places >> place) & 1)
+        .map((place) => low + place);
+      if (numbers.length === 4 && numbers[3] <= ANSWER_MAX) {
+        sets.push({ numbers, weight: 6 - (numbers[3] - low) });
+      }
+    }
+  }
+  const holding = new Map();
+  for (let n = ANSWER_MIN; n <= ANSWER_MAX; n++) {
+    holding.set(n, sets.filter((set) => set.numbers.includes(n)));
+  }
+  for (let round = 0; round < 200; round++) {
+    for (const group of holding.values()) {
+      const total = group.reduce((sum, set) => sum + set.weight, 0);
+      for (const set of group) set.weight /= total;
+    }
+  }
+  return holding;
+})();
+
 export const drawOptions = (answer) => {
+  const sets = optionSets.get(answer);
+  if (sets) {
+    let left = Math.random();
+    const set = sets.find(({ weight }) => (left -= weight) < 0) ?? sets.at(-1);
+    return shuffle([...set.numbers]);
+  }
   const rank = Math.floor(Math.random() * 4);
   const pattern = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 4).sort((a, b) => a - b);
   return shuffle(pattern.map((place) => answer + place - pattern[rank]));

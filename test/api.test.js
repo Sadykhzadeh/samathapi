@@ -135,25 +135,54 @@ test('where the answer falls among the options gives nothing away', async () => 
       assert.equal(new Set(quizOptions).size, 4, `${quizOptions}`);
       assert.ok(quizOptions.includes(answer), `${answer} not in ${quizOptions}`);
       assert.ok(quizOptions.every((o) => Math.abs(o - answer) <= 5), `${quizOptions} for ${answer}`);
+      assert.ok(quizOptions.every((o) => o >= 10 && o <= 20), `${quizOptions} outside 10..20`);
       ranks[quizOptions.filter((o) => o < answer).length]++;
     }
   }
   for (const count of ranks) assert.ok(Math.abs(count - 500) < 100, `ranks ${ranks}`);
 
-  // And for every shape the four can take, not only on average.
+  // And for every shape the four can take, not only on average, for an
+  // answer outside the 10..20 samathgen draws from.
   const byShape = new Map();
   for (let i = 0; i < 40000; i++) {
-    const options = drawOptions(12);
+    const options = drawOptions(40);
     const sorted = [...options].sort((a, b) => a - b);
     const shape = sorted.map((o) => o - sorted[0]).join(',');
     if (!byShape.has(shape)) byShape.set(shape, [0, 0, 0, 0]);
-    byShape.get(shape)[sorted.indexOf(12)]++;
+    byShape.get(shape)[sorted.indexOf(40)]++;
   }
   assert.equal(byShape.size, 10);
   for (const [shape, counts] of byShape) {
     const expected = counts.reduce((a, b) => a + b) / 4;
     for (const count of counts) {
       assert.ok(Math.abs(count - expected) < expected * 0.2, `${shape}: ${counts}`);
+    }
+  }
+});
+
+test('knowing every answer is from 10 to 20 gives nothing away either', () => {
+  // A pupil who had noticed could rule out 6, 7 and 8 against 10, and with
+  // options around the answer alone guessed right 34% of the time.
+  const bySet = new Map();
+  for (let answer = 10; answer <= 20; answer++) {
+    for (let i = 0; i < 60000; i++) {
+      const set = drawOptions(answer).sort((a, b) => a - b).join(',');
+      if (!bySet.has(set)) bySet.set(set, new Map());
+      bySet.get(set).set(answer, (bySet.get(set).get(answer) ?? 0) + 1);
+    }
+  }
+  // Every four numbers from 10 to 20 that fit in six in a row turn up, and
+  // whichever four a pupil sees, each was the answer as often as the others.
+  assert.equal(bySet.size, 65);
+  for (const [set, answers] of bySet) {
+    const numbers = set.split(',').map(Number);
+    assert.ok(numbers.every((n, i) => n >= 10 && n <= 20 && n > (numbers[i - 1] ?? 0)), set);
+    assert.ok(numbers[3] - numbers[0] <= 5, set);
+    assert.deepEqual([...answers.keys()].sort((a, b) => a - b), numbers, set);
+    const counts = [...answers.values()];
+    const expected = counts.reduce((a, b) => a + b) / 4;
+    for (const count of counts) {
+      assert.ok(Math.abs(count - expected) < expected * 0.25, `${set}: ${counts}`);
     }
   }
 });
