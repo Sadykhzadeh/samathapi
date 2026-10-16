@@ -60,6 +60,7 @@ can be negative, as `-10` in `-10+1*5*4`.
 | --- | --- | --- |
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
 | `brackets` | `true` or `false` | the `brackets` setting |
+| `negatives` | `true` or `false` | the `negatives` setting |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
 
@@ -72,6 +73,14 @@ A value outside those is answered with `400` and the reason, as
 message with `c=true`. A task that cannot be generated is a `500` in the same
 two formats, with the message `could not generate a task`. With `brackets=true`, samathgen 0.1.3 puts one or two
 more numbers inside the bracket than `length` asks for.
+
+With `negatives=false` no task has a number below zero in it, and none passes
+below zero on the way to its answer, worked out left to right: `-29+47` and
+`2-5+15` are drawn again, `20-5-3` is served. That is for a class that has not
+met negative numbers, since samathgen 0.1.3 puts one in about a quarter of its
+tasks and two in five with brackets. Setting `negatives=false` in the
+environment does the same for every request that does not ask otherwise, so
+a client that never sends it, such as SaMathCLI, gets it too.
 
 ### Many tasks in one request
 
@@ -138,4 +147,5 @@ longer than a client will read.
 | `lengthFrom` | `2` | Fewest terms in a generated task |
 | `lengthTo` | `4` | Most terms in a generated task |
 | `brackets` | `false` | Set to `true` to wrap part of the task in brackets |
+| `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
 

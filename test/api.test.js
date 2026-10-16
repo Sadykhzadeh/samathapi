@@ -219,7 +219,7 @@ const spyApp = async (env = {}) => {
   let calls = 0;
   // A different task every call, so none of them is drawn again as a repeat.
   const spy = (length, options) => {
-    asked.push({ length, brackets: options.brackets });
+    asked.push({ length, brackets: options.brackets, negatives: options.negatives });
     calls++;
     return { task: [calls, '+', 1], answer: calls + 1, quizOptions: [1, 2, 3, 4] };
   };
@@ -230,9 +230,10 @@ test('a request can ask for its own length and brackets', async () => {
   const app = await spyApp({ lengthFrom: '2', lengthTo: '3' });
   try {
     for (const [query, expected] of [
-      ['length=7', { length: 7, brackets: false }],
-      ['length=12&brackets=true', { length: 12, brackets: true }],
-      ['length=2&brackets=false&c=true', { length: 2, brackets: false }],
+      ['length=7', { length: 7, brackets: false, negatives: true }],
+      ['length=12&brackets=true', { length: 12, brackets: true, negatives: true }],
+      ['length=2&brackets=false&c=true', { length: 2, brackets: false, negatives: true }],
+      ['length=5&negatives=false', { length: 5, brackets: false, negatives: false }],
     ]) {
       const res = await fetch(`${app.base}/gen?${query}`);
       assert.equal(res.status, 200, query);
@@ -256,7 +257,47 @@ test('brackets in the request overrides the config both ways', async () => {
   }
 });
 
-test('a length or brackets it cannot honour is a 400 that says why', async () => {
+test('negatives=false keeps every number and every step at 0 or above', async () => {
+  // samathgen 0.1.3 puts a negative number in about one task in four, as
+  // in -29+47, and two in five with brackets; a few more pass below zero on
+  // the way, as in 2-5+15.
+  for (const query of ['length=2', 'length=4&brackets=true', 'length=12', 'length=12&brackets=true']) {
+    const res = await fetch(`${base}/gen?negatives=false&count=${COUNT_MAX}&${query}`);
+    assert.equal(res.status, 200, query);
+    for (const { task, answer } of await res.json()) {
+      assert.equal(evaluate(task.join(''), { negatives: false }), answer, task.join(''));
+    }
+  }
+});
+
+test('negatives in the request overrides the config both ways', async () => {
+  const app = await spyApp({ negatives: 'false' });
+  try {
+    await (await fetch(`${app.base}/gen`)).text();
+    assert.equal(app.asked.pop().negatives, false);
+    await (await fetch(`${app.base}/gen?negatives=true`)).text();
+    assert.equal(app.asked.pop().negatives, true);
+  } finally {
+    app.server.close();
+  }
+
+  const drawn = [[2, '-', 5, '+', 15], [-3, '+', 15], [17, '-', 5]];
+  let call = 0;
+  const strict = await listen(createApp(readConfig({ negatives: 'false' }), () => {
+    const task = drawn[call++ % drawn.length];
+    return { task, answer: 12, quizOptions: [] };
+  }));
+  try {
+    assert.match(await (await fetch(`${strict.base}/gen?c=true`)).text(), /^17-5 /);
+    assert.equal(call, 3);
+    call = 0;
+    assert.match(await (await fetch(`${strict.base}/gen?c=true&negatives=true`)).text(), /^2-5\+15 /);
+  } finally {
+    strict.server.close();
+  }
+});
+
+test('a length, brackets or negatives it cannot honour is a 400 that says why', async () => {
   const app = await spyApp();
   try {
     for (const query of ['length=1', 'length=13', 'length=4.5', 'length=abc', 'length=', 'length=3&length=4', 'length=-3']) {
@@ -268,6 +309,11 @@ test('a length or brackets it cannot honour is a 400 that says why', async () =>
       const res = await fetch(`${app.base}/gen?${query}`);
       assert.equal(res.status, 400, query);
       assert.deepEqual(await res.json(), { error: 'brackets must be true or false' }, query);
+    }
+    for (const query of ['negatives=no', 'negatives=0', 'negatives=', 'negatives=false&negatives=false']) {
+      const res = await fetch(`${app.base}/gen?${query}`);
+      assert.equal(res.status, 400, query);
+      assert.deepEqual(await res.json(), { error: 'negatives must be true or false' }, query);
     }
     const res = await fetch(`${app.base}/gen?c=true&length=40`);
     assert.equal(res.status, 400);
@@ -314,7 +360,7 @@ test('each task of a count draws its own length unless the request fixes one', a
     assert.deepEqual([...new Set(app.asked.map((a) => a.length))].sort(), [2, 3, 4, 5]);
     app.asked.length = 0;
     await (await fetch(`${app.base}/gen?count=10&length=6&brackets=true`)).text();
-    assert.deepEqual(app.asked, Array(10).fill({ length: 6, brackets: true }));
+    assert.deepEqual(app.asked, Array(10).fill({ length: 6, brackets: true, negatives: true }));
   } finally {
     app.server.close();
   }
@@ -433,10 +479,10 @@ test('a seed it cannot honour is a 400 that says why', async () => {
 });
 
 test('readConfig falls back on anything that is not a whole number', () => {
-  assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, port: 3000 });
+  assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, port: 3000 });
   assert.deepEqual(
-    readConfig({ lengthFrom: 'abc', lengthTo: '', brackets: 'yes', PORT: 'x' }),
-    { lengthFrom: 2, lengthTo: 4, brackets: false, port: 3000 },
+    readConfig({ lengthFrom: 'abc', lengthTo: '', brackets: 'yes', negatives: 'no', PORT: 'x' }),
+    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, port: 3000 },
   );
 });
 
@@ -448,10 +494,11 @@ test('readConfig falls back on a PORT that is not a port', () => {
   assert.equal(readConfig({ PORT: '65535' }).port, 65535);
 });
 
-test('readConfig clamps lengths to 2..12 and reads brackets as a flag', () => {
+test('readConfig clamps lengths to 2..12 and reads brackets and negatives as flags', () => {
   assert.deepEqual(
-    readConfig({ lengthFrom: '0', lengthTo: '400', brackets: 'true', PORT: '8080' }),
-    { lengthFrom: 2, lengthTo: 12, brackets: true, port: 8080 },
+    readConfig({ lengthFrom: '0', lengthTo: '400', brackets: 'true', negatives: 'false', PORT: '8080' }),
+    { lengthFrom: 2, lengthTo: 12, brackets: true, negatives: false, port: 8080 },
   );
   assert.equal(readConfig({ brackets: 'false' }).brackets, false);
+  assert.equal(readConfig({ negatives: 'true' }).negatives, true);
 });

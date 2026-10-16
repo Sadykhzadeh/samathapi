@@ -39,3 +39,14 @@ test('anything else that is not a task is NaN', () => {
     assert.ok(Number.isNaN(evaluate(text)), JSON.stringify(text));
   }
 });
+
+test('negatives: false refuses a number or a step below zero', () => {
+  for (const text of ['-3+5', '2-5+15', '20-4*6+10', '(1-2)+5', '7-(-5)', '3-(5-8)']) {
+    assert.ok(Number.isNaN(evaluate(text, { negatives: false })), text);
+    assert.ok(!Number.isNaN(evaluate(text)), text);
+  }
+  assert.equal(evaluate('12-(5+3)', { negatives: false }), 4);
+  assert.equal(evaluate('7-(2-1)*3', { negatives: false }), 4);
+  assert.equal(evaluate('5-5+2', { negatives: false }), 2);
+  assert.equal(evaluate('3*4/2', { negatives: false }), 6);
+});
