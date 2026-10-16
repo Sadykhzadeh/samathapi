@@ -93,6 +93,10 @@ Without a `length`, every task draws its own from the configured range. The
 list shape follows the parameter and not the number: `count=1` is a list of
 one.
 
+No task comes twice in one list: a task the list already holds is drawn
+again. Short tasks are few, under 600 with two numbers, so without that most
+20-question quizzes of them would ask one twice.
+
 ### The same quiz twice
 
 With a `seed` a request gives the same answer every time, so a teacher can
@@ -108,9 +112,11 @@ curl 'http://localhost:3000/gen?c=true&count=3&seed=2024'
 # 9-2+6 10,14,13,11 13
 ```
 
-A seeded task goes through the same check as any other. What a seed gives is
-fixed for a given server and samathgen version; upgrading samathgen can change
-the quiz a seed names.
+A seeded task goes through the same check as any other, but is not drawn
+again for repeating an earlier one, since then it would no longer be the task
+for its seed: a seeded quiz of short tasks can ask one twice. What a seed
+gives is fixed for a given server and samathgen version; upgrading samathgen
+can change the quiz a seed names.
 
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of

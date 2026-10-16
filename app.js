@@ -231,6 +231,7 @@ export const createApp = (config, generate = mathGen) => {
       return;
     }
     const tasks = [];
+    const asked = new Set();
     try {
       for (let i = 0; i < (request.count ?? 1); i++) {
         // The generator is still asked for options of its own, which are
@@ -243,11 +244,23 @@ export const createApp = (config, generate = mathGen) => {
           );
           return result && { ...result, quizOptions: drawOptions(result.answer) };
         };
-        // Task i of a count is the task a request for seed + i would give.
+        // A quiz asks each question once, so a task it already holds is
+        // drawn again, up to ATTEMPTS times before the repeat is served.
+        const fresh = () => {
+          let result;
+          for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+            result = draw();
+            if (!result || !asked.has(result.task.join(''))) break;
+          }
+          return result;
+        };
+        // Task i of a count is the task a request for seed + i would give,
+        // which a redraw would break, so a seeded quiz can repeat a task.
         const result = request.seed === undefined
-          ? draw()
+          ? fresh()
           : seeded((request.seed + i) % (SEED_MAX + 1), draw);
         if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
+        asked.add(result.task.join(''));
         tasks.push(result);
       }
     } catch (error) {
