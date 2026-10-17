@@ -599,9 +599,24 @@ test('a name sent twice is not read as either value', async () => {
   assert.match(res.headers.get('content-type'), /^application\/json/);
 });
 
+// A config that reads fine while the app is built and throws on the first
+// request, to reach the handler's last resort.
+const brokenConfig = () => {
+  const config = readConfig({});
+  let built = false;
+  Object.defineProperty(config, 'negatives', {
+    get() {
+      if (built) throw new Error('boom');
+      built = true;
+      return true;
+    },
+  });
+  return config;
+};
+
 test('a request that breaks the handler is a 500, not a dropped connection', async (t) => {
   t.mock.method(console, 'error', () => {});
-  const broken = await listen(createApp(null));
+  const broken = await listen(createApp(brokenConfig()));
   try {
     const res = await fetch(`${broken.base}/gen`);
     assert.equal(res.status, 500);
@@ -645,7 +660,7 @@ test('a parameter that is no typo of a known one is ignored', async () => {
 
 test('every answer, errors included, may be read from a page on another origin', async (t) => {
   t.mock.method(console, 'error', () => {});
-  const broken = await listen(createApp(null));
+  const broken = await listen(createApp(brokenConfig()));
   try {
     for (const [method, url] of [
       ['GET', `${base}/`], ['GET', `${base}/healthz`], ['GET', `${base}/gen`], ['GET', `${base}/gen?c=true&count=3`],
