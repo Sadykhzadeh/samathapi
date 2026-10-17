@@ -88,7 +88,11 @@ A value outside those is answered with `400`, what is wrong and what was
 sent, as `{"error":"length must be a whole number from 2 to 12, not \"40\""}`,
 or as the bare message with `c=true`. Every parameter that is wrong is named in
 the one answer, separated by `;`, so a request is fixed in one go, and a
-parameter sent twice is refused as well. A task that cannot be generated is a
+parameter sent twice is refused as well. A parameter the server does not know
+is ignored, so a client may send more than an older server takes, unless it is
+a misspelling of one it does: `bracket=true` is a `400`,
+`unknown parameter "bracket", did you mean brackets?`, rather than a worksheet
+without brackets. A task that cannot be generated is a
 `500` in the same two formats, with the message `could not generate a task`.
 With `brackets=true`, samathgen 0.1.3 puts one or two more numbers inside the
 bracket than `length` asks for.

@@ -610,3 +610,35 @@ test('a request that breaks the handler is a 500, not a dropped connection', asy
     broken.server.close();
   }
 });
+
+test('a parameter that is a typo of a known one is a 400 that suggests the right one', async () => {
+  const app = await spyApp();
+  try {
+    for (const [name, suggestion] of [
+      ['lenght', 'length'], ['lengh', 'length'], ['bracket', 'brackets'], ['Brackets', 'brackets'],
+      ['negative', 'negatives'], ['negatvies', 'negatives'], ['counts', 'count'], ['cuont', 'count'],
+      ['sed', 'seed'], ['seeds', 'seed'],
+    ]) {
+      assert.equal(await badRequest(app, `${name}=3`), `unknown parameter "${name}", did you mean ${suggestion}?`, name);
+    }
+    assert.equal(
+      await badRequest(app, 'lenght=3&bracket=true&count=0'),
+      'unknown parameter "lenght", did you mean length?; unknown parameter "bracket", did you mean brackets?; '
+        + `count must be a whole number from 1 to ${COUNT_MAX}, not "0"`,
+    );
+    assert.equal(app.asked.length, 0);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a parameter that is no typo of a known one is ignored', async () => {
+  const app = await spyApp();
+  try {
+    for (const query of ['utm_source=mail', '_=1700000000', 'ref=class4', 'lang=az', 'format=json', 'cb=12', 'x=1&y=2']) {
+      assert.equal((await fetch(`${app.base}/gen?${query}`)).status, 200, query);
+    }
+  } finally {
+    app.server.close();
+  }
+});
