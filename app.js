@@ -51,8 +51,10 @@ const genNumber = (first, second) => {
 // per task.
 const ATTEMPTS = 500;
 
+// `asked` is the range [low, high] the request wants the answer from.
 const isSound = ({ task, answer }, { negatives, answer: asked }) =>
-  evaluate(task.join(''), { negatives }) === answer && (asked === undefined || answer === asked);
+  evaluate(task.join(''), { negatives }) === answer
+  && (asked === undefined || (answer >= asked[0] && answer <= asked[1]));
 
 export const drawSound = (generate, length, options) => {
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
@@ -390,15 +392,16 @@ const cliLine = ({ task, answer, quizOptions }) =>
 
 // The generator is not asked for quiz options: they are drawn below, from the
 // range the answer comes from, which it knows nothing about.
-// With an answer range each task is asked for an answer drawn from it, and
-// one that comes back with another is drawn again.
+// With an answer range the generator draws each task's answer from it, the
+// ends included, among the answers the other options can build; one that
+// comes back outside it is drawn again.
 const drawTask = (generate, request, config) => {
   const { answers } = request;
   const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo);
   const options = { brackets: request.brackets, negatives: request.negatives };
   if (request.operators) options.operators = request.operators;
   if (request.max !== undefined) options.max = request.max;
-  if (answers) options.answer = genNumber(answers.min, answers.max);
+  if (answers) options.answer = [answers.min, answers.max];
   const result = drawSound(generate, length, options);
   return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max)) };
 };
