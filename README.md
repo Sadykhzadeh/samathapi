@@ -97,6 +97,7 @@ in `(-96)/((52-28)/(-3))`.
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
 | `brackets` | `true`, `false` or `never` | the `brackets` setting, `true` or `false` |
 | `negatives` | `true` or `false` | the `negatives` setting |
+| `operators` | some of `add`, `subtract`, `multiply` and `divide`, separated by commas, each once | all four |
 | `max` | how far from zero any number may be, a whole number from `10` to `10000` | `10000` |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
@@ -115,8 +116,8 @@ is ignored, so a client may send more than an older server takes, unless it is
 a misspelling of one it does: `bracket=true` is a `400`,
 `unknown parameter "bracket", did you mean brackets?`, rather than a worksheet
 without brackets. Options that samathgen refuses, because no task can be built
-from them, are a `400` with its message, `no task of 4 terms evaluating to 0
-can be built from * /`. A task that cannot be generated for any other reason
+from them, are a `400` with its message, `no task of 8 terms evaluating to an
+answer from 10 to 20 can be built from / without brackets`. A task that cannot be generated for any other reason
 is a `500` in the same two formats, with the message `could not generate a
 task`.
 
@@ -163,6 +164,36 @@ The answers still come from 10 to 20, unless `max` is below 20, when they come
 from half of it up to it, `5` to `10` for `max=10`, and so do the options. A
 range of your own with `answerMin` and `answerMax` may not go past `max`.
 `max` is part of what a seed names.
+
+### Only some operators
+
+A class that has met adding and taking away and nothing else asks for
+`operators=add,subtract`. The names are `add`, `subtract`, `multiply` and
+`divide`, in any order, because a `+` in a query string is a space and `*` and
+`/` are a trouble to type at a shell. Without `operators` a task may use all
+four, and two tasks in three of three numbers do use `*` or `/`.
+
+```sh
+curl 'http://localhost:3000/gen?c=true&count=3&length=3&operators=add,subtract&max=20&negatives=false&brackets=never&seed=7'
+# 6+14-1 14,16,18,19 19
+# 5+6+1 10,15,12,11 12
+# 12+7-1 20,18,19,17 18
+curl 'http://localhost:3000/gen?c=true&count=3&length=2&operators=multiply&seed=2024'
+# 5*2 10,12,14,13 10
+# 7*2 14,12,15,11 14
+# 8*2 19,14,16,18 16
+```
+
+Every answer is still from the range, and a range has only so many answers a
+task can come to. Two numbers of `multiply` make 10, 12, 14, 15, 16, 18 or 20
+and no other, so there the options are still spread over 10 to 20 and a pupil
+who has noticed that 11 is never the answer can rule it out.
+
+A few combinations cannot be built, and are a `400` that says which. `divide`
+alone with `brackets=never` runs out of room from 7 numbers, and from 3 under
+`max=10`; `subtract` alone with `negatives=false` and `brackets=never` does
+from 7 numbers under `max=20`; and `add` alone cannot make 12 numbers within
+`max=10` without negatives, since each is at least 1.
 
 ### Answers in a range of your own
 

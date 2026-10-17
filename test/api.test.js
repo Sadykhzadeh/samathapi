@@ -307,6 +307,81 @@ test('brackets=never leaves out every group, and false does not', async () => {
   assert.ok(tasks.filter(({ task }) => hasGroup(task)).length > 20);
 });
 
+test('operators reach the generator as symbols in its own order, and without them nothing is said', async () => {
+  const seen = [];
+  const app = await listen(createApp(readConfig({}), (length, options) => {
+    seen.push(options);
+    return { task: [seen.length, '+', 1], answer: seen.length + 1, quizOptions: [] };
+  }));
+  try {
+    for (const operators of ['divide,add', 'multiply', 'add,subtract,multiply,divide']) {
+      await (await fetch(`${app.base}/gen?operators=${operators}`)).text();
+    }
+    await (await fetch(`${app.base}/gen`)).text();
+  } finally {
+    app.server.close();
+  }
+  assert.deepEqual(seen.map((options) => options.operators), [['+', '/'], ['*'], ['+', '-', '*', '/'], undefined]);
+  assert.ok(!('operators' in seen[3]));
+});
+
+test('a task uses only the operators the request names, and still works out', async () => {
+  const symbols = { add: '+', subtract: '-', multiply: '*', divide: '/' };
+  for (const names of [['add'], ['subtract'], ['multiply'], ['divide'], ['add', 'subtract'], ['multiply', 'divide'], ['add', 'multiply'], ['subtract', 'divide']]) {
+    for (const length of [2, 3, 5]) {
+      const query = `operators=${names.join(',')}&length=${length}`;
+      const res = await fetch(`${base}/gen?${query}&count=${COUNT_MAX}`);
+      assert.equal(res.status, 200, query);
+      for (const { task, answer } of await res.json()) {
+        const used = new Set(task.filter((piece) => typeof piece === 'string' && piece !== '(' && piece !== ')'));
+        for (const symbol of used) assert.ok(names.some((name) => symbols[name] === symbol), `${task.join('')} for ${query}`);
+        assert.equal(evaluate(task.join('')), answer, task.join(''));
+        assert.ok(answer >= 10 && answer <= 20, `${answer} for ${query}`);
+      }
+    }
+  }
+});
+
+test('the same operators in another order are the same request', async () => {
+  const text = async (operators) => (await fetch(`${base}/gen?seed=12&count=10&length=3&operators=${operators}`)).text();
+  assert.equal(await text('add,divide'), await text('divide,add'));
+  assert.notEqual(await text('add,divide'), await text('add,multiply'));
+});
+
+test('operators it cannot honour are a 400 that says why', async () => {
+  const app = await spyApp();
+  try {
+    const rule = 'some of add, subtract, multiply and divide, separated by commas, not';
+    for (const [query, error] of [
+      ['operators=plus', `operators must be ${rule} "plus"`],
+      ['operators=', `operators must be ${rule} ""`],
+      ['operators=add,', `operators must be ${rule} "add,"`],
+      ['operators=add,,subtract', `operators must be ${rule} "add,,subtract"`],
+      ['operators=Add', `operators must be ${rule} "Add"`],
+      ['operators=%2B', `operators must be ${rule} "+"`],
+      ['operators=add%20subtract', `operators must be ${rule} "add subtract"`],
+      ['operators=constructor', `operators must be ${rule} "constructor"`],
+      ['operators=add,add', 'operators names add twice, name it once'],
+      ['operators=add&operators=divide', 'operators was sent 2 times, send it once'],
+    ]) {
+      assert.equal(await badRequest(app, query), error, query);
+    }
+    assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('operators that cannot make a task together with the rest are a 400 from the generator', async () => {
+  // Divide alone, with no brackets to put a divisor in, runs out of room.
+  for (const query of ['operators=divide&brackets=never&length=12', 'operators=add&max=10&negatives=false&length=12']) {
+    const res = await fetch(`${base}/gen?${query}&c=true`);
+    assert.equal(res.status, 400, query);
+    assert.match(await res.text(), /^no task of 12 terms evaluating to /, query);
+  }
+  assert.equal((await fetch(`${base}/gen?operators=divide&length=12`)).status, 200, 'with brackets it can');
+});
+
 test('max reaches the generator as a number, and without it nothing is said', async () => {
   const seen = [];
   const app = await listen(createApp(readConfig({}), (length, options) => {
@@ -766,7 +841,7 @@ test('a parameter that is a typo of a known one is a 400 that suggests the right
     for (const [name, suggestion] of [
       ['lenght', 'length'], ['lengh', 'length'], ['bracket', 'brackets'], ['Brackets', 'brackets'],
       ['negative', 'negatives'], ['negatvies', 'negatives'], ['counts', 'count'], ['cuont', 'count'],
-      ['sed', 'seed'], ['seeds', 'seed'], ['maxx', 'max'], ['mac', 'max'],
+      ['sed', 'seed'], ['seeds', 'seed'], ['maxx', 'max'], ['mac', 'max'], ['operator', 'operators'], ['operaters', 'operators'],
     ]) {
       assert.equal(await badRequest(app, `${name}=3`), `unknown parameter "${name}", did you mean ${suggestion}?`, name);
     }

@@ -174,6 +174,10 @@ export const COUNT_MAX = 100;
 export const ANSWER_LIMIT = 500;
 export const ANSWER_SPAN = 100;
 
+// The operators a request may name, spelt out because + is a space in a query
+// string and * and / are a trouble to type. The generator takes the symbols.
+export const OPERATOR_NAMES = { add: '+', subtract: '-', multiply: '*', divide: '/' };
+
 // How far from zero a request may let any number go, in the task and on the
 // way to its answer. samathgen takes 10 to 10000 and uses 10000 when it is
 // not told.
@@ -229,7 +233,7 @@ const complaint = (name, rule, value) => (Array.isArray(value)
 // more than an older server takes, unless it is a typo of one it does: a
 // teacher who sends bracket=true should hear that it did nothing, not get a
 // worksheet without brackets.
-const PARAMETERS = ['length', 'brackets', 'negatives', 'max', 'count', 'seed', 'answerMin', 'answerMax'];
+const PARAMETERS = ['length', 'brackets', 'negatives', 'operators', 'max', 'count', 'seed', 'answerMin', 'answerMax'];
 
 const LONGEST = Math.max(...PARAMETERS.map((name) => name.length));
 
@@ -263,11 +267,12 @@ const misspelt = (name) => {
 };
 
 const readRequest = (query, config) => {
-  const { length, brackets, negatives, max, count, seed } = query;
+  const { length, brackets, negatives, operators, max, count, seed } = query;
   const request = {
     length: undefined,
     brackets: config.brackets,
     negatives: config.negatives,
+    operators: undefined,
     max: undefined,
     count: undefined,
     seed: undefined,
@@ -289,6 +294,19 @@ const readRequest = (query, config) => {
   if (negatives !== undefined) {
     if (negatives === 'true' || negatives === 'false') request.negatives = negatives === 'true';
     else errors.push(complaint('negatives', 'true or false', negatives));
+  }
+  if (operators !== undefined) {
+    const names = typeof operators === 'string' ? operators.split(',') : [];
+    const twice = names.find((name, i) => names.indexOf(name) !== i);
+    if (names.length === 0 || !names.every((name) => Object.hasOwn(OPERATOR_NAMES, name))) {
+      errors.push(complaint('operators', 'some of add, subtract, multiply and divide, separated by commas', operators));
+    } else if (twice !== undefined) {
+      errors.push(`operators names ${twice} twice, name it once`);
+    } else {
+      // In the generator's order, so that the same operators in another order
+      // are the same request.
+      request.operators = Object.entries(OPERATOR_NAMES).filter(([name]) => names.includes(name)).map(([, symbol]) => symbol);
+    }
   }
   if (max !== undefined) {
     const parsed = wholeNumber(max);
@@ -378,6 +396,7 @@ const drawTask = (generate, request, config) => {
   const { answers } = request;
   const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo);
   const options = { brackets: request.brackets, negatives: request.negatives };
+  if (request.operators) options.operators = request.operators;
   if (request.max !== undefined) options.max = request.max;
   if (answers) options.answer = genNumber(answers.min, answers.max);
   const result = drawSound(generate, length, options);
@@ -486,6 +505,7 @@ export const createApp = (config, generate = mathGen) => {
     lengthMax: LENGTH_MAX,
     countMax: COUNT_MAX,
     seedMax: SEED_MAX,
+    operatorNames: Object.keys(OPERATOR_NAMES),
     maxLeast: MAX_LEAST,
     maxMost: MAX_MOST,
     answerLimit: ANSWER_LIMIT,
@@ -516,7 +536,7 @@ export const createApp = (config, generate = mathGen) => {
       return asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(tasks);
     };
     const key = request.seed === undefined ? undefined : [
-      asText, request.length, request.brackets, request.negatives, request.max, request.count, request.seed,
+      asText, request.length, request.brackets, request.negatives, request.operators, request.max, request.count, request.seed,
       request.answers?.min, request.answers?.max,
     ].join();
     let entry = key === undefined ? undefined : cache.get(key);

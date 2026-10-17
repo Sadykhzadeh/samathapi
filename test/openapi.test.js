@@ -37,7 +37,7 @@ test('every path it lists is served, and every path served is listed', async () 
 
 test('the limits it states are the limits the server enforces', async () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
-  assert.deepEqual(Object.keys(parameters).sort(), ['answerMax', 'answerMin', 'brackets', 'c', 'count', 'length', 'max', 'negatives', 'seed']);
+  assert.deepEqual(Object.keys(parameters).sort(), ['answerMax', 'answerMin', 'brackets', 'c', 'count', 'length', 'max', 'negatives', 'operators', 'seed']);
 
   const status = async (query) => (await fetch(`${base}/gen?${query}`)).status;
   const limits = {
@@ -78,6 +78,17 @@ test('the limits it states are the limits the server enforces', async () => {
   for (const value of parameters.brackets.schema.enum) assert.equal(await status(`brackets=${value}`), 200, value);
   assert.equal(await status('brackets=maybe'), 400);
   assert.deepEqual(parameters.c.schema.enum, ['true', 'false']);
+
+  const { schema: operators } = parameters.operators;
+  assert.equal(parameters.operators.style, 'form');
+  assert.equal(parameters.operators.explode, false);
+  assert.equal(operators.type, 'array');
+  assert.deepEqual(operators.items.enum, ['add', 'subtract', 'multiply', 'divide']);
+  for (const name of operators.items.enum) assert.equal(await status(`operators=${name}`), 200, name);
+  assert.equal(await status(`operators=${operators.items.enum.join(',')}`), 200);
+  assert.equal(await status('operators=plus'), 400);
+  assert.equal(await status('operators=add,add'), 400);
+  assert.equal(await status('operators='), 400);
 });
 
 test('the defaults it states are the settings the server runs on', () => {
