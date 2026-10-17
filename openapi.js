@@ -1,7 +1,7 @@
 // The OpenAPI description of the server, built from the limits and settings
 // the server itself runs on, so it cannot say 2 to 12 where the code says
 // something else.
-export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, maxLeast, maxMost, answerLimit, answerSpan, config }) => {
+export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, operatorNames, maxLeast, maxMost, answerLimit, answerSpan, config }) => {
   const error = (description) => ({
     description,
     content: {
@@ -81,6 +81,14 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, ma
               in: 'query',
               description: 'Allow a number below zero in a task or on the way to its answer. false is for a class that has not met them.',
               schema: { type: 'boolean', default: config.negatives },
+            },
+            {
+              name: 'operators',
+              in: 'query',
+              description: 'Which operators a task may use, separated by commas, for a class that has not met them all: add,subtract is for one that has not met multiplication. Without it all four. Some combinations cannot be built, such as divide alone with brackets=never at 7 numbers or more, and are a 400.',
+              style: 'form',
+              explode: false,
+              schema: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', enum: operatorNames } },
             },
             {
               name: 'max',
