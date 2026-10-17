@@ -174,11 +174,12 @@ const refusing = (generate) => (length, options) => {
 // most; past this a count from a query string stops being a quiz.
 export const COUNT_MAX = 100;
 
-// The answers a request may ask for: whole numbers from 1 to ANSWER_LIMIT,
-// with at most ANSWER_SPAN between the least and the most. The limit is as far
+// The answers a request may ask for: whole numbers from ANSWER_LEAST to
+// ANSWER_LIMIT, with at most ANSWER_SPAN between the least and the most. The limit is as far
 // as samathgen lets a number go. The span keeps the work of making the options
 // give nothing away within a few milliseconds: the sets for a range that has
 // not been asked for lately take 3.5 ms at 100 wide, 8.5 at 200, 31 at 500.
+export const ANSWER_LEAST = 0;
 export const ANSWER_LIMIT = 10000;
 export const ANSWER_SPAN = 100;
 
@@ -319,11 +320,11 @@ const readRequest = (query, config) => {
   }
   const { answerMin, answerMax } = query;
   if (answerMin !== undefined || answerMax !== undefined) {
-    const rule = `a whole number from 1 to ${ANSWER_LIMIT}`;
+    const rule = `a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}`;
     const min = answerMin === undefined ? undefined : wholeNumber(answerMin);
     const max = answerMax === undefined ? undefined : wholeNumber(answerMax);
-    const minOk = min >= 1 && min <= ANSWER_LIMIT;
-    const maxOk = max >= 1 && max <= ANSWER_LIMIT;
+    const minOk = min >= ANSWER_LEAST && min <= ANSWER_LIMIT;
+    const maxOk = max >= ANSWER_LEAST && max <= ANSWER_LIMIT;
     if (answerMin !== undefined && !minOk) errors.push(complaint('answerMin', rule, answerMin));
     if (answerMax !== undefined && !maxOk) errors.push(complaint('answerMax', rule, answerMax));
     if (answerMin === undefined) errors.push('answerMax needs answerMin as well');
@@ -510,6 +511,7 @@ export const createApp = (config, generate = mathGen) => {
     operatorNames: Object.keys(OPERATOR_NAMES),
     maxLeast: MAX_LEAST,
     maxMost: MAX_MOST,
+    answerLeast: ANSWER_LEAST,
     answerLimit: ANSWER_LIMIT,
     answerSpan: ANSWER_SPAN,
     config,

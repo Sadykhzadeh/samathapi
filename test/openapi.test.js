@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, readConfig } from '../app.js';
+import { ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, readConfig } from '../app.js';
 
 let server;
 let base;
@@ -59,14 +59,15 @@ test('the limits it states are the limits the server enforces', async () => {
   for (const name of ['answerMin', 'answerMax']) {
     const { schema } = parameters[name];
     assert.equal(schema.type, 'integer');
-    assert.equal(schema.minimum, 1, name);
+    assert.equal(schema.minimum, ANSWER_LEAST, name);
     assert.equal(schema.maximum, ANSWER_LIMIT, name);
   }
   assert.match(parameters.answerMin.description, new RegExp(`at most ${ANSWER_SPAN} more`));
   const other = { answerMin: 'answerMax', answerMax: 'answerMin' };
   for (const name of Object.keys(other)) {
     assert.equal(await status(`${name}=1&${other[name]}=1`), 200, name);
-    assert.equal(await status(`${name}=0&${other[name]}=1`), 400, name);
+    assert.equal(await status(`${name}=-1&${other[name]}=1`), 400, name);
+    assert.equal(await status(`${name}=0&${other[name]}=0`), 200, name);
     assert.equal(await status(`${name}=${ANSWER_LIMIT + 1}&${other[name]}=1`), 400, name);
   }
   assert.equal(await status(`answerMin=${ANSWER_LIMIT - ANSWER_SPAN}&answerMax=${ANSWER_LIMIT}`), 200);

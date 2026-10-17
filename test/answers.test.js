@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, createApp, drawOptions, readConfig } from '../app.js';
+import { ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, createApp, drawOptions, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
 const listen = (app) => new Promise((resolve) => {
@@ -42,6 +42,31 @@ test('the whole range is used, not only a corner of it', async () => {
     for (const { answer } of await quiz('answerMin=50&answerMax=60&length=3')) seen.add(answer);
   }
   assert.deepEqual([...seen].sort((a, b) => a - b), [50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60]);
+});
+
+test('0 is an answer a range may start at or hold', async () => {
+  assert.equal(ANSWER_LEAST, 0);
+  for (const task of await quiz('answerMin=0&answerMax=0&length=3')) {
+    assert.equal(task.answer, 0);
+    assert.equal(evaluate(task.task.join('')), 0, task.task.join(''));
+  }
+  const seen = new Set();
+  for (let i = 0; i < 5; i++) {
+    for (const { task, answer, quizOptions } of await quiz('answerMin=0&answerMax=10&length=2')) {
+      seen.add(answer);
+      assert.equal(evaluate(task.join('')), answer, task.join(''));
+      assert.ok(quizOptions.every((o) => o >= 0 && o <= 10), `${quizOptions} for ${answer}`);
+    }
+  }
+  assert.deepEqual([...seen].sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});
+
+test('an answer of 0 that the operators cannot make is a 400 from the generator', async () => {
+  for (const query of ['operators=multiply', 'operators=add&negatives=false']) {
+    const res = await fetch(`${base}/gen?answerMin=0&answerMax=0&length=2&${query}`);
+    assert.equal(res.status, 400, query);
+    assert.match((await res.json()).error, /^no task of 2 terms evaluating to 0 can be built from /, query);
+  }
 });
 
 test('a range of one number gives that answer every time', async () => {
@@ -131,11 +156,11 @@ test('a range it cannot honour is a 400 that says why', async () => {
   assert.equal(await error('answerMin=50'), 'answerMin needs answerMax as well');
   assert.equal(await error('answerMax=50'), 'answerMax needs answerMin as well');
   assert.equal(await error('answerMin=50&answerMax=20'), 'answerMin must not be more than answerMax, 50 is more than 20');
-  assert.equal(await error('answerMin=0&answerMax=5'), `answerMin must be a whole number from 1 to ${ANSWER_LIMIT}, not "0"`);
-  assert.equal(await error(`answerMin=1&answerMax=${ANSWER_LIMIT + 1}`), `answerMax must be a whole number from 1 to ${ANSWER_LIMIT}, not "${ANSWER_LIMIT + 1}"`);
-  assert.equal(await error('answerMin=-3&answerMax=5'), `answerMin must be a whole number from 1 to ${ANSWER_LIMIT}, not "-3"`);
-  assert.equal(await error('answerMin=1.5&answerMax=5'), `answerMin must be a whole number from 1 to ${ANSWER_LIMIT}, not "1.5"`);
-  assert.equal(await error('answerMin=a&answerMax=b'), `answerMin must be a whole number from 1 to ${ANSWER_LIMIT}, not "a"; answerMax must be a whole number from 1 to ${ANSWER_LIMIT}, not "b"`);
+  assert.equal(await error('answerMin=-1&answerMax=5'), `answerMin must be a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}, not "-1"`);
+  assert.equal(await error(`answerMin=1&answerMax=${ANSWER_LIMIT + 1}`), `answerMax must be a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}, not "${ANSWER_LIMIT + 1}"`);
+  assert.equal(await error('answerMin=-3&answerMax=5'), `answerMin must be a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}, not "-3"`);
+  assert.equal(await error('answerMin=1.5&answerMax=5'), `answerMin must be a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}, not "1.5"`);
+  assert.equal(await error('answerMin=a&answerMax=b'), `answerMin must be a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}, not "a"; answerMax must be a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}, not "b"`);
   assert.equal(await error('answerMin=5&answerMin=6&answerMax=9'), 'answerMin was sent 2 times, send it once');
   assert.equal(
     await error(`answerMin=1&answerMax=${ANSWER_SPAN + 2}`),
