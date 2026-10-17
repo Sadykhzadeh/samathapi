@@ -158,6 +158,14 @@ for its seed: a seeded quiz of short tasks can ask one twice. What a seed
 gives is fixed for a given server and samathgen version; upgrading samathgen
 can change the quiz a seed names.
 
+Because a seed names the same answer every time, the server keeps the seeded
+answers it has given (up to 4 MB of them, oldest dropped first) and does not
+draw them again, and sends them with `Cache-Control: public, max-age=3600` and
+an `ETag`; a request with a matching `If-None-Match` is a `304` with no body.
+That is a seeded `count=100` at 35 000 requests per second, where drawing it
+each time gave 5 500, and a seeded 12-term quiz at 28 000 where it gave 240.
+An answer without a seed is new every time and says `Cache-Control: no-store`.
+
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
 its own only at the start or just inside a bracket. A task that fails is
