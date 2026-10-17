@@ -73,8 +73,8 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, an
             {
               name: 'brackets',
               in: 'query',
-              description: 'Wrap part of the task in brackets.',
-              schema: { type: 'boolean', default: config.brackets },
+              description: 'true asks for a group in brackets, as in (2+3)*4. false does not ask for one, but a task still has a bracket where the order of working needs it, as in 12-(5+3). never leaves out every group, as in 12-5-3; only a negative number keeps its own brackets, as in 7-(-5), and negatives=false takes those away.',
+              schema: { type: 'string', enum: ['true', 'false', 'never'], default: String(config.brackets) },
             },
             {
               name: 'negatives',

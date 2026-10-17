@@ -267,8 +267,11 @@ const readRequest = (query, config) => {
     else errors.push(complaint('length', `a whole number from ${LENGTH_MIN} to ${LENGTH_MAX}`, length));
   }
   if (brackets !== undefined) {
-    if (brackets === 'true' || brackets === 'false') request.brackets = brackets === 'true';
-    else errors.push(complaint('brackets', 'true or false', brackets));
+    // 'never' goes to the generator as it is: it asks for a task with no group
+    // in brackets at all, which false does not.
+    if (brackets === 'never') request.brackets = 'never';
+    else if (brackets === 'true' || brackets === 'false') request.brackets = brackets === 'true';
+    else errors.push(complaint('brackets', 'true, false or never', brackets));
   }
   if (negatives !== undefined) {
     if (negatives === 'true' || negatives === 'false') request.negatives = negatives === 'true';

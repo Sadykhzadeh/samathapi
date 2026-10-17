@@ -70,18 +70,18 @@ test('the limits it states are the limits the server enforces', async () => {
   }
   assert.equal(await status(`answerMin=${ANSWER_LIMIT - ANSWER_SPAN}&answerMax=${ANSWER_LIMIT}`), 200);
   assert.equal(await status(`answerMin=${ANSWER_LIMIT - ANSWER_SPAN - 1}&answerMax=${ANSWER_LIMIT}`), 400);
-  for (const name of ['brackets', 'negatives']) {
-    assert.equal(parameters[name].schema.type, 'boolean');
-    assert.equal(await status(`${name}=true`), 200);
-    assert.equal(await status(`${name}=false`), 200);
-    assert.equal(await status(`${name}=maybe`), 400);
-  }
+  assert.equal(parameters.negatives.schema.type, 'boolean');
+  for (const value of ['true', 'false']) assert.equal(await status(`negatives=${value}`), 200);
+  assert.equal(await status('negatives=maybe'), 400);
+  assert.deepEqual(parameters.brackets.schema.enum, ['true', 'false', 'never']);
+  for (const value of parameters.brackets.schema.enum) assert.equal(await status(`brackets=${value}`), 200, value);
+  assert.equal(await status('brackets=maybe'), 400);
   assert.deepEqual(parameters.c.schema.enum, ['true', 'false']);
 });
 
 test('the defaults it states are the settings the server runs on', () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
-  assert.equal(parameters.brackets.schema.default, true);
+  assert.equal(parameters.brackets.schema.default, 'true');
   assert.equal(parameters.negatives.schema.default, false);
   assert.match(parameters.length.description, /from 3 to 5/);
 });
