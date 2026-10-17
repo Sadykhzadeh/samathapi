@@ -138,6 +138,26 @@ export const drawOptions = (answer, range = DEFAULT_RANGE) => {
   return shuffle(pattern.map((place) => answer + place - pattern[rank]));
 };
 
+// samathgen throws a TypeError for an option it does not have or a value of
+// the wrong type, and a RangeError for a value out of range or a combination
+// that cannot be built. The request is checked before it gets here, so either
+// means the options the server passed are wrong, never a fault in the
+// generator itself, and neither may come out as a 500. Only what the
+// generator throws is read this way: a TypeError from the server's own code
+// is still a 500.
+class Refused extends Error {}
+
+const refusing = (generate) => (length, options) => {
+  try {
+    return generate(length, options);
+  } catch (error) {
+    if (error instanceof TypeError || error instanceof RangeError) {
+      throw new Refused(error.message, { cause: error });
+    }
+    throw error;
+  }
+};
+
 // How many tasks one request may ask for. A quiz is a few dozen questions at
 // most; past this a count from a query string stops being a quiz.
 export const COUNT_MAX = 100;
@@ -447,6 +467,8 @@ export const createApp = (config, generate = mathGen) => {
     config,
   }));
 
+  const generator = refusing(generate);
+
   const gen = (req, res, query) => {
     const asText = wantsText(query, req.headers.accept);
     const type = asText ? TEXT_TYPE : JSON_TYPE;
@@ -474,9 +496,16 @@ export const createApp = (config, generate = mathGen) => {
     let entry = key === undefined ? undefined : cache.get(key);
     if (entry === undefined) {
       try {
-        const body = render(drawTasks(generate, request, config));
+        const body = render(drawTasks(generator, request, config));
         entry = { body, etag: key === undefined ? undefined : etagOf(body) };
       } catch (error) {
+        if (error instanceof Refused) {
+          // A TypeError means the server asked wrongly, which is worth a line
+          // in the log; a RangeError is a combination the client can change.
+          if (error.cause instanceof TypeError) console.error('mathGen refused the options:', error);
+          fail(400, error.message);
+          return;
+        }
         // keep the stack trace out of the reply
         console.error('mathGen failed:', error);
         fail(500, 'could not generate a task');

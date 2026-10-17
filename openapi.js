@@ -129,7 +129,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, an
               },
             },
             304: { description: 'The If-None-Match tag of a seeded answer is current' },
-            400: error('A parameter is wrong, misspelt or sent twice; the message names each one and what was sent'),
+            400: error('A parameter is wrong, misspelt or sent twice, or no task can be built from the parameters together; the message names each one and what was sent, or gives the reason the generator gave'),
             500: error('A task could not be generated'),
           },
         },

@@ -113,8 +113,11 @@ parameter sent twice is refused as well. A parameter the server does not know
 is ignored, so a client may send more than an older server takes, unless it is
 a misspelling of one it does: `bracket=true` is a `400`,
 `unknown parameter "bracket", did you mean brackets?`, rather than a worksheet
-without brackets. A task that cannot be generated is a
-`500` in the same two formats, with the message `could not generate a task`.
+without brackets. Options that samathgen refuses, because no task can be built
+from them, are a `400` with its message, `no task of 4 terms evaluating to 0
+can be built from * /`. A task that cannot be generated for any other reason
+is a `500` in the same two formats, with the message `could not generate a
+task`.
 
 With `negatives=false` no task has a number below zero in it, and none passes
 below zero on the way to its answer, worked out left to right: `-29+47` and
