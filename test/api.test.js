@@ -502,3 +502,68 @@ test('readConfig clamps lengths to 2..12 and reads brackets and negatives as fla
   assert.equal(readConfig({ brackets: 'false' }).brackets, false);
   assert.equal(readConfig({ negatives: 'true' }).negatives, true);
 });
+
+test('a path that is not served is a 404 in JSON', async () => {
+  for (const path of ['/nope', '/gen/extra', '/__proto__', '/constructor', '/healthz.json']) {
+    const res = await fetch(`${base}${path}`);
+    assert.equal(res.status, 404, path);
+    assert.match(res.headers.get('content-type'), /^application\/json/);
+    assert.deepEqual(await res.json(), { error: 'not found' }, path);
+  }
+});
+
+test('a trailing slash or capitals still reach the endpoint', async () => {
+  for (const path of ['/gen/', '/GEN', '/healthz/', '/Healthz']) {
+    assert.equal((await fetch(`${base}${path}`)).status, 200, path);
+  }
+});
+
+test('a method the endpoint does not take is a 405 that lists the ones it does', async () => {
+  for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
+    for (const path of ['/', '/healthz', '/gen']) {
+      const res = await fetch(`${base}${path}`, { method });
+      assert.equal(res.status, 405, `${method} ${path}`);
+      assert.equal(res.headers.get('allow'), 'GET, HEAD, OPTIONS');
+      assert.deepEqual(await res.json(), { error: 'method not allowed' });
+    }
+  }
+});
+
+test('HEAD answers with the headers of the GET and no body', async () => {
+  for (const path of ['/', '/healthz', '/gen?seed=3']) {
+    const res = await fetch(`${base}${path}`, { method: 'HEAD' });
+    assert.equal(res.status, 200, path);
+    assert.ok(Number(res.headers.get('content-length')) > 0, path);
+    assert.equal(await res.text(), '', path);
+  }
+});
+
+test('OPTIONS is a 204 that lists the methods', async () => {
+  const res = await fetch(`${base}/gen`, { method: 'OPTIONS' });
+  assert.equal(res.status, 204);
+  assert.equal(res.headers.get('allow'), 'GET, HEAD, OPTIONS');
+});
+
+test('a response says how long it is and does not name the framework', async () => {
+  const res = await fetch(`${base}/gen?count=5`);
+  const body = await res.text();
+  assert.equal(Number(res.headers.get('content-length')), Buffer.byteLength(body));
+  assert.equal(res.headers.get('x-powered-by'), null);
+});
+
+test('a name sent twice is not read as either value', async () => {
+  const res = await fetch(`${base}/gen?c=true&c=false`);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+});
+
+test('a request that breaks the handler is a 500, not a dropped connection', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const broken = await listen(createApp(null));
+  try {
+    const res = await fetch(`${broken.base}/gen`);
+    assert.equal(res.status, 500);
+    assert.deepEqual(await res.json(), { error: 'internal error' });
+  } finally {
+    broken.server.close();
+  }
+});

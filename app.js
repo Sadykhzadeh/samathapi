@@ -1,4 +1,4 @@
-import express from 'express';
+import http from 'node:http';
 import { mathGen } from 'samathgen';
 import { evaluate } from './evaluate.js';
 
@@ -162,11 +162,11 @@ const seeded = (seed, work) => {
   }
 };
 
-// A request may ask for its own length, brackets, negatives, count and seed,
-// within the same bounds as the config. A value that is given but unusable
-// is a 400 naming it, not a quiet fallback: a client that asked for 20 terms
-// should hear that it cannot have them. Without a length each task draws its
-// own from the configured range.
+// What a request asks for. A value that is given but unusable is a 400 naming
+// it, not a quiet fallback: a client that asked for 20 terms should hear that
+// it cannot have them. Without a length each task draws its own from the
+// configured range. A name sent twice arrives as an array, which none of the
+// checks below accepts.
 const readRequest = (query, config) => {
   const { length, brackets, negatives, count, seed } = query;
   const request = {
@@ -212,69 +212,94 @@ const readRequest = (query, config) => {
   return request;
 };
 
+// The query string as an object: a name sent once is its value, a name sent
+// again turns into an array of its values, as the framework used to do.
+const readQuery = (url) => {
+  const query = Object.create(null);
+  const at = url.indexOf('?');
+  if (at === -1) return query;
+  for (const [name, value] of new URLSearchParams(url.slice(at + 1))) {
+    query[name] = name in query ? [].concat(query[name], value) : value;
+  }
+  return query;
+};
+
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", the line SaMathCLI parses.
 const cliLine = ({ task, answer, quizOptions }) =>
   `${task.join('')} ${quizOptions.join(',')} ${answer}`;
 
-// `generate` is mathGen unless a test hands in something else.
+// The generator is still asked for options of its own, which are replaced:
+// the tasks a seed gives depend on every number it draws.
+const drawTask = (generate, request, config) => {
+  const result = drawSound(
+    generate,
+    request.length ?? genNumber(config.lengthFrom, config.lengthTo),
+    { brackets: request.brackets, negatives: request.negatives, quizMode: true },
+  );
+  return result && { ...result, quizOptions: drawOptions(result.answer) };
+};
+
+// A quiz asks each question once, so a task it already holds is drawn again,
+// up to ATTEMPTS times before the repeat is served.
+const drawFresh = (generate, request, config, asked) => {
+  let result;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    result = drawTask(generate, request, config);
+    if (!result || !asked.has(result.task.join(''))) break;
+  }
+  return result;
+};
+
+// The tasks a request asks for. Task i of a count is the task a request for
+// seed + i would give, which a redraw would break, so a seeded quiz can
+// repeat a task. Throws when a task cannot be drawn.
+const drawTasks = (generate, request, config) => {
+  const tasks = [];
+  const asked = new Set();
+  for (let i = 0; i < (request.count ?? 1); i++) {
+    const result = request.seed === undefined
+      ? drawFresh(generate, request, config, asked)
+      : seeded((request.seed + i) % (SEED_MAX + 1), () => drawTask(generate, request, config));
+    if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
+    asked.add(result.task.join(''));
+    tasks.push(result);
+  }
+  return tasks;
+};
+
+const JSON_TYPE = 'application/json; charset=utf-8';
+const TEXT_TYPE = 'text/plain; charset=utf-8';
+
+const send = (res, status, type, body, headers) => {
+  res.writeHead(status, {
+    'Content-Type': type,
+    'Content-Length': Buffer.byteLength(body),
+    ...headers,
+  });
+  res.end(body);
+};
+
+const ALLOWED = 'GET, HEAD, OPTIONS';
+
+// `generate` is mathGen unless a test hands in something else. What comes
+// back is a plain http.Server, not yet listening.
 export const createApp = (config, generate = mathGen) => {
-  const app = express();
-
-  app.get('/', (req, res) => {
-    res.type('text/plain').send('Hello World');
-  });
-
-  app.get('/healthz', (req, res) => {
-    res.json({ ok: true });
-  });
-
-  app.get('/gen', (req, res) => {
-    const isCLI = flag(req.query.c);
+  const gen = (req, res, query) => {
+    const isCLI = flag(query.c);
     // An error comes in the format the request asked for, as the bare
     // message for c=true and as {"error": "..."} otherwise.
     const fail = (status, message) => {
-      res.status(status);
-      if (isCLI) res.type('text/plain').send(message);
-      else res.json({ error: message });
+      if (isCLI) send(res, status, TEXT_TYPE, message);
+      else send(res, status, JSON_TYPE, JSON.stringify({ error: message }));
     };
-    const request = readRequest(req.query, config);
+    const request = readRequest(query, config);
     if (request.error) {
       fail(400, request.error);
       return;
     }
-    const tasks = [];
-    const asked = new Set();
+    let tasks;
     try {
-      for (let i = 0; i < (request.count ?? 1); i++) {
-        // The generator is still asked for options of its own, which are
-        // replaced: the tasks a seed gives depend on every number it draws.
-        const draw = () => {
-          const result = drawSound(
-            generate,
-            request.length ?? genNumber(config.lengthFrom, config.lengthTo),
-            { brackets: request.brackets, negatives: request.negatives, quizMode: true },
-          );
-          return result && { ...result, quizOptions: drawOptions(result.answer) };
-        };
-        // A quiz asks each question once, so a task it already holds is
-        // drawn again, up to ATTEMPTS times before the repeat is served.
-        const fresh = () => {
-          let result;
-          for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-            result = draw();
-            if (!result || !asked.has(result.task.join(''))) break;
-          }
-          return result;
-        };
-        // Task i of a count is the task a request for seed + i would give,
-        // which a redraw would break, so a seeded quiz can repeat a task.
-        const result = request.seed === undefined
-          ? fresh()
-          : seeded((request.seed + i) % (SEED_MAX + 1), draw);
-        if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
-        asked.add(result.task.join(''));
-        tasks.push(result);
-      }
+      tasks = drawTasks(generate, request, config);
     } catch (error) {
       // keep the stack trace out of the reply
       console.error('mathGen failed:', error);
@@ -282,14 +307,45 @@ export const createApp = (config, generate = mathGen) => {
       return;
     }
     if (request.count === undefined) {
-      if (isCLI) res.type('text/plain').send(cliLine(tasks[0]));
-      else res.json(tasks[0]);
+      if (isCLI) send(res, 200, TEXT_TYPE, cliLine(tasks[0]));
+      else send(res, 200, JSON_TYPE, JSON.stringify(tasks[0]));
     } else if (isCLI) {
-      res.type('text/plain').send(`${tasks.map(cliLine).join('\n')}\n`);
+      send(res, 200, TEXT_TYPE, `${tasks.map(cliLine).join('\n')}\n`);
     } else {
-      res.json(tasks);
+      send(res, 200, JSON_TYPE, JSON.stringify(tasks));
+    }
+  };
+
+  const routes = new Map(Object.entries({
+    '/': (req, res) => send(res, 200, TEXT_TYPE, 'Hello World'),
+    '/healthz': (req, res) => send(res, 200, JSON_TYPE, '{"ok":true}'),
+    '/gen': (req, res) => gen(req, res, readQuery(req.url)),
+  }));
+
+  const handle = (req, res) => {
+    const at = req.url.indexOf('?');
+    let path = (at === -1 ? req.url : req.url.slice(0, at)).toLowerCase();
+    if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
+    const route = routes.get(path);
+    if (!route) {
+      send(res, 404, JSON_TYPE, '{"error":"not found"}');
+    } else if (req.method === 'GET' || req.method === 'HEAD') {
+      route(req, res);
+    } else if (req.method === 'OPTIONS') {
+      res.writeHead(204, { Allow: ALLOWED });
+      res.end();
+    } else {
+      send(res, 405, JSON_TYPE, '{"error":"method not allowed"}', { Allow: ALLOWED });
+    }
+  };
+
+  return http.createServer((req, res) => {
+    try {
+      handle(req, res);
+    } catch (error) {
+      console.error('request failed:', error);
+      if (!res.headersSent) send(res, 500, JSON_TYPE, '{"error":"internal error"}');
+      else res.destroy();
     }
   });
-
-  return app;
 };

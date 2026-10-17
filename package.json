@@ -15,8 +15,7 @@
   "keywords": [
     "math",
     "generator",
-    "api",
-    "express"
+    "api"
   ],
   "author": "",
   "license": "ISC",
@@ -26,7 +25,6 @@
   "homepage": "https://got.az/azer/samathapi",
   "dependencies": {
     "dotenv": "^18.0.0",
-    "express": "^5.1.0",
     "samathgen": "^0.1.3"
   },
   "type": "module",
