@@ -115,11 +115,11 @@ parameter sent twice is refused as well. A parameter the server does not know
 is ignored, so a client may send more than an older server takes, unless it is
 a misspelling of one it does: `bracket=true` is a `400`,
 `unknown parameter "bracket", did you mean brackets?`, rather than a worksheet
-without brackets. Options that samathgen refuses, because no task can be built
-from them, are a `400` with its message, `no task of 8 terms evaluating to an
-answer from 10 to 20 can be built from / without brackets`. A task that cannot be generated for any other reason
-is a `500` in the same two formats, with the message `could not generate a
-task`.
+without brackets. Options that samathgen refuses, because no task can be
+built from them, are a `400` with its message, `no task of 8 terms evaluating
+to an answer from 10 to 20 can be built from / without brackets`. A task that
+cannot be generated for any other reason is a `500` in the same two formats,
+with the message `could not generate a task`.
 
 With `negatives=false` no task has a number below zero in it, and none passes
 below zero on the way to its answer, worked out left to right: `-29+47` and
@@ -211,14 +211,14 @@ may not be wider than 100 numbers, which keeps the work of building those
 options small, and runs from 0 to 10000. It goes with `length`, `brackets`,
 `negatives`, `count` and `seed`; the range is part of what a seed names.
 
-A range narrower than four answers has no four options inside it, so there they
-fall around the answer, and still stay at 0 or above with `negatives=false` and
-within `max`.
-
 The range may start at 0, as `answerMin=0&answerMax=20` does for a class that
 counts within twenty, and then `6-6` is a task. A range of 0 alone, or a range
 that holds only answers the operators cannot make, is a `400` that says so:
 `multiply` alone cannot make 0.
+
+A range narrower than four answers has no four options inside it, so there they
+fall around the answer, and still stay at 0 or above with `negatives=false` and
+within `max`.
 
 A range of a few numbers has few tasks to give, so a `count` of 100 with
 `answerMin=1&answerMax=1` repeats: the server draws again for a repeat at most
@@ -245,8 +245,8 @@ list shape follows the parameter and not the number: `count=1` is a list of
 one.
 
 No task comes twice in one list: a task the list already holds is drawn
-again. Short tasks are few, under 600 with two numbers, so without that most
-20-question quizzes of them would ask one twice. A request draws again for
+again. Short tasks are few, about 1 200 with two numbers, so without that a
+third of 20-question quizzes of them would ask one twice. A request draws again for
 repeats at most 500 times in all, so a range with very few tasks in it still
 answers quickly, with a repeat or two.
 

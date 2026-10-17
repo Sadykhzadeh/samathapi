@@ -619,8 +619,8 @@ test('each task of a count draws its own length unless the request fixes one', a
 });
 
 test('a quiz does not ask the same question twice', async () => {
-  // There are under 600 sound 2-term tasks and "39/3" alone is one in 65
-  // of them, so most 20-question quizzes of them would ask one twice.
+  // There are about 1 200 2-term tasks and "5*2" alone is one in 104 of
+  // them, so a third of 20-question quizzes of them would ask one twice.
   for (const query of ['length=2&count=20', 'length=2&count=100', 'count=100']) {
     for (let i = 0; i < 10; i++) {
       const tasks = (await (await fetch(`${base}/gen?${query}`)).json()).map(({ task }) => task.join(''));
