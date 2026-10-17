@@ -1,7 +1,7 @@
 // The OpenAPI description of the server, built from the limits and settings
 // the server itself runs on, so it cannot say 2 to 12 where the code says
 // something else.
-export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, answerLimit, answerSpan, config }) => {
+export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, maxLeast, maxMost, answerLimit, answerSpan, config }) => {
   const error = (description) => ({
     description,
     content: {
@@ -81,6 +81,12 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, an
               in: 'query',
               description: 'Allow a number below zero in a task or on the way to its answer. false is for a class that has not met them.',
               schema: { type: 'boolean', default: config.negatives },
+            },
+            {
+              name: 'max',
+              in: 'query',
+              description: 'How far from zero any number may be: every number in the task and every step of working it out left to right. A small max is for a class that counts within 20 or 100. Without it, 10000. Without answerMin and answerMax the answers are then from 10 to 20, or from half of a max below 20 up to the max.',
+              schema: { type: 'integer', minimum: maxLeast, maximum: maxMost },
             },
             {
               name: 'count',

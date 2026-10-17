@@ -126,6 +126,12 @@ const optionSetsFor = (range) => {
   return sets;
 };
 
+// Where samathgen draws an answer from when it is not told: 10 to 20, or from
+// half of a max below 20 up to the max.
+const defaultRange = (max) => (max === undefined || max >= 20
+  ? DEFAULT_RANGE
+  : { min: Math.floor((max + 1) / 2), max });
+
 export const drawOptions = (answer, range = DEFAULT_RANGE) => {
   const sets = optionSetsFor(range).get(answer);
   if (sets) {
@@ -167,6 +173,12 @@ export const COUNT_MAX = 100;
 // work of making the options give nothing away within a few milliseconds.
 export const ANSWER_LIMIT = 500;
 export const ANSWER_SPAN = 100;
+
+// How far from zero a request may let any number go, in the task and on the
+// way to its answer. samathgen takes 10 to 10000 and uses 10000 when it is
+// not told.
+export const MAX_LEAST = 10;
+export const MAX_MOST = 10000;
 
 // A seed is 32 bits wide, which is all the generator below can use.
 export const SEED_MAX = 2 ** 32 - 1;
@@ -217,7 +229,7 @@ const complaint = (name, rule, value) => (Array.isArray(value)
 // more than an older server takes, unless it is a typo of one it does: a
 // teacher who sends bracket=true should hear that it did nothing, not get a
 // worksheet without brackets.
-const PARAMETERS = ['length', 'brackets', 'negatives', 'count', 'seed', 'answerMin', 'answerMax'];
+const PARAMETERS = ['length', 'brackets', 'negatives', 'max', 'count', 'seed', 'answerMin', 'answerMax'];
 
 const LONGEST = Math.max(...PARAMETERS.map((name) => name.length));
 
@@ -251,11 +263,12 @@ const misspelt = (name) => {
 };
 
 const readRequest = (query, config) => {
-  const { length, brackets, negatives, count, seed } = query;
+  const { length, brackets, negatives, max, count, seed } = query;
   const request = {
     length: undefined,
     brackets: config.brackets,
     negatives: config.negatives,
+    max: undefined,
     count: undefined,
     seed: undefined,
     answers: undefined,
@@ -276,6 +289,11 @@ const readRequest = (query, config) => {
   if (negatives !== undefined) {
     if (negatives === 'true' || negatives === 'false') request.negatives = negatives === 'true';
     else errors.push(complaint('negatives', 'true or false', negatives));
+  }
+  if (max !== undefined) {
+    const parsed = wholeNumber(max);
+    if (parsed >= MAX_LEAST && parsed <= MAX_MOST) request.max = parsed;
+    else errors.push(complaint('max', `a whole number from ${MAX_LEAST} to ${MAX_MOST}`, max));
   }
   if (count !== undefined) {
     const parsed = wholeNumber(count);
@@ -301,6 +319,8 @@ const readRequest = (query, config) => {
     else if (minOk && maxOk && min > max) errors.push(`answerMin must not be more than answerMax, ${min} is more than ${max}`);
     else if (minOk && maxOk && max - min > ANSWER_SPAN) {
       errors.push(`answerMax must be at most ${ANSWER_SPAN} more than answerMin, ${max} is ${max - min} more than ${min}`);
+    } else if (minOk && maxOk && request.max !== undefined && max > request.max) {
+      errors.push(`answerMax must not be more than max, ${max} is more than ${request.max}`);
     }
     if (errors.length === 0) request.answers = { min, max };
   }
@@ -358,9 +378,10 @@ const drawTask = (generate, request, config) => {
   const { answers } = request;
   const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo);
   const options = { brackets: request.brackets, negatives: request.negatives };
+  if (request.max !== undefined) options.max = request.max;
   if (answers) options.answer = genNumber(answers.min, answers.max);
   const result = drawSound(generate, length, options);
-  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? DEFAULT_RANGE) };
+  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max)) };
 };
 
 // A quiz asks each question once, so a task it already holds is drawn again,
@@ -465,6 +486,8 @@ export const createApp = (config, generate = mathGen) => {
     lengthMax: LENGTH_MAX,
     countMax: COUNT_MAX,
     seedMax: SEED_MAX,
+    maxLeast: MAX_LEAST,
+    maxMost: MAX_MOST,
     answerLimit: ANSWER_LIMIT,
     answerSpan: ANSWER_SPAN,
     config,
@@ -493,7 +516,7 @@ export const createApp = (config, generate = mathGen) => {
       return asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(tasks);
     };
     const key = request.seed === undefined ? undefined : [
-      asText, request.length, request.brackets, request.negatives, request.count, request.seed,
+      asText, request.length, request.brackets, request.negatives, request.max, request.count, request.seed,
       request.answers?.min, request.answers?.max,
     ].join();
     let entry = key === undefined ? undefined : cache.get(key);
