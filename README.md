@@ -32,8 +32,8 @@ nothing extra to install.
 `npm run bench` starts the server and prints how long it took to answer its
 first request, how much memory it holds, and the requests per second and
 latency of each path on keep-alive connections. `node bench/bench.js --seconds 10`
-runs longer, `--connections 64` sends more at once, `--gzip` asks for compressed answers as a
-browser does, and `node bench/bench.js '/gen?count=50'`
+runs longer, `--connections 64` sends more at once, `--gzip` asks for
+compressed answers as a browser does, and `node bench/bench.js '/gen?count=50'`
 measures a path of your own. The client is Node as well, so compare runs on
 one machine rather than numbers between machines.
 
@@ -57,7 +57,7 @@ returns JSON. Without a `c`, the `Accept` header decides: a client that asks
 for `text/plain` ahead of JSON gets the plain line, so
 `/gen?c=true` and the request below are the same answer. A browser or `curl`
 with no header, which accept anything, get JSON. Errors follow the same
-choice, and the answer carries `Vary: Accept`.
+choice, and the answer carries `Vary: Accept, Accept-Encoding`.
 
 ```sh
 curl -H 'Accept: text/plain' 'http://localhost:3000/gen?seed=2024'
@@ -171,7 +171,9 @@ one.
 
 No task comes twice in one list: a task the list already holds is drawn
 again. Short tasks are few, under 600 with two numbers, so without that most
-20-question quizzes of them would ask one twice.
+20-question quizzes of them would ask one twice. A request draws again for
+repeats at most 500 times in all, so a range with very few tasks in it still
+answers quickly, with a repeat or two.
 
 ### The same quiz twice
 
