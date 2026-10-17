@@ -163,10 +163,20 @@ const seeded = (seed, work) => {
 };
 
 // What a request asks for. A value that is given but unusable is a 400 naming
-// it, not a quiet fallback: a client that asked for 20 terms should hear that
-// it cannot have them. Without a length each task draws its own from the
-// configured range. A name sent twice arrives as an array, which none of the
-// checks below accepts.
+// it and what was sent, not a quiet fallback: a client that asked for 20 terms
+// should hear that it cannot have them. Every parameter that is wrong is
+// named at once, so a request is fixed in one go. Without a length each task
+// draws its own from the configured range. A name sent twice arrives as an
+// array, which is refused as well.
+const sent = (value) => {
+  const text = value.length > 24 ? `${value.slice(0, 24)}...` : value;
+  return JSON.stringify(text);
+};
+
+const complaint = (name, rule, value) => (Array.isArray(value)
+  ? `${name} was sent ${value.length} times, send it once`
+  : `${name} must be ${rule}, not ${sent(value)}`);
+
 const readRequest = (query, config) => {
   const { length, brackets, negatives, count, seed } = query;
   const request = {
@@ -176,40 +186,31 @@ const readRequest = (query, config) => {
     count: undefined,
     seed: undefined,
   };
+  const errors = [];
   if (length !== undefined) {
     const parsed = wholeNumber(length);
-    if (!(parsed >= LENGTH_MIN && parsed <= LENGTH_MAX)) {
-      return { error: `length must be a whole number from ${LENGTH_MIN} to ${LENGTH_MAX}` };
-    }
-    request.length = parsed;
+    if (parsed >= LENGTH_MIN && parsed <= LENGTH_MAX) request.length = parsed;
+    else errors.push(complaint('length', `a whole number from ${LENGTH_MIN} to ${LENGTH_MAX}`, length));
   }
   if (brackets !== undefined) {
-    if (brackets !== 'true' && brackets !== 'false') {
-      return { error: 'brackets must be true or false' };
-    }
-    request.brackets = brackets === 'true';
+    if (brackets === 'true' || brackets === 'false') request.brackets = brackets === 'true';
+    else errors.push(complaint('brackets', 'true or false', brackets));
   }
   if (negatives !== undefined) {
-    if (negatives !== 'true' && negatives !== 'false') {
-      return { error: 'negatives must be true or false' };
-    }
-    request.negatives = negatives === 'true';
+    if (negatives === 'true' || negatives === 'false') request.negatives = negatives === 'true';
+    else errors.push(complaint('negatives', 'true or false', negatives));
   }
   if (count !== undefined) {
     const parsed = wholeNumber(count);
-    if (!(parsed >= 1 && parsed <= COUNT_MAX)) {
-      return { error: `count must be a whole number from 1 to ${COUNT_MAX}` };
-    }
-    request.count = parsed;
+    if (parsed >= 1 && parsed <= COUNT_MAX) request.count = parsed;
+    else errors.push(complaint('count', `a whole number from 1 to ${COUNT_MAX}`, count));
   }
   if (seed !== undefined) {
     const parsed = wholeNumber(seed);
-    if (!(parsed <= SEED_MAX)) {
-      return { error: `seed must be a whole number from 0 to ${SEED_MAX}` };
-    }
-    request.seed = parsed;
+    if (parsed <= SEED_MAX) request.seed = parsed;
+    else errors.push(complaint('seed', `a whole number from 0 to ${SEED_MAX}`, seed));
   }
-  return request;
+  return errors.length > 0 ? { error: errors.join('; ') } : request;
 };
 
 // The query string as an object: a name sent once is its value, a name sent

@@ -297,29 +297,72 @@ test('negatives in the request overrides the config both ways', async () => {
   }
 });
 
+const badRequest = async (app, query) => {
+  const res = await fetch(`${app.base}/gen?${query}`);
+  assert.equal(res.status, 400, query);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  const { error, ...rest } = await res.json();
+  assert.deepEqual(rest, {}, 'nothing but "error" in the body');
+  return error;
+};
+
 test('a length, brackets or negatives it cannot honour is a 400 that says why', async () => {
   const app = await spyApp();
   try {
-    for (const query of ['length=1', 'length=13', 'length=4.5', 'length=abc', 'length=', 'length=3&length=4', 'length=-3']) {
-      const res = await fetch(`${app.base}/gen?${query}`);
-      assert.equal(res.status, 400, query);
-      assert.deepEqual(await res.json(), { error: 'length must be a whole number from 2 to 12' }, query);
-    }
-    for (const query of ['brackets=yes', 'brackets=1', 'brackets=TRUE']) {
-      const res = await fetch(`${app.base}/gen?${query}`);
-      assert.equal(res.status, 400, query);
-      assert.deepEqual(await res.json(), { error: 'brackets must be true or false' }, query);
-    }
-    for (const query of ['negatives=no', 'negatives=0', 'negatives=', 'negatives=false&negatives=false']) {
-      const res = await fetch(`${app.base}/gen?${query}`);
-      assert.equal(res.status, 400, query);
-      assert.deepEqual(await res.json(), { error: 'negatives must be true or false' }, query);
+    for (const [query, error] of [
+      ['length=1', 'length must be a whole number from 2 to 12, not "1"'],
+      ['length=13', 'length must be a whole number from 2 to 12, not "13"'],
+      ['length=4.5', 'length must be a whole number from 2 to 12, not "4.5"'],
+      ['length=abc', 'length must be a whole number from 2 to 12, not "abc"'],
+      ['length=', 'length must be a whole number from 2 to 12, not ""'],
+      ['length=-3', 'length must be a whole number from 2 to 12, not "-3"'],
+      ['length=3&length=4', 'length was sent 2 times, send it once'],
+      ['brackets=yes', 'brackets must be true or false, not "yes"'],
+      ['brackets=1', 'brackets must be true or false, not "1"'],
+      ['brackets=TRUE', 'brackets must be true or false, not "TRUE"'],
+      ['negatives=no', 'negatives must be true or false, not "no"'],
+      ['negatives=', 'negatives must be true or false, not ""'],
+      ['negatives=false&negatives=false', 'negatives was sent 2 times, send it once'],
+    ]) {
+      assert.equal(await badRequest(app, query), error, query);
     }
     const res = await fetch(`${app.base}/gen?c=true&length=40`);
     assert.equal(res.status, 400);
     assert.match(res.headers.get('content-type'), /^text\/plain/);
-    assert.equal(await res.text(), 'length must be a whole number from 2 to 12');
+    assert.equal(await res.text(), 'length must be a whole number from 2 to 12, not "40"');
     assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('every parameter that is wrong is named in one answer', async () => {
+  const app = await spyApp();
+  try {
+    assert.equal(
+      await badRequest(app, 'length=99&brackets=maybe&count=0&seed=-1&negatives=false'),
+      'length must be a whole number from 2 to 12, not "99"; brackets must be true or false, not "maybe"; '
+        + `count must be a whole number from 1 to ${COUNT_MAX}, not "0"; seed must be a whole number from 0 to ${SEED_MAX}, not "-1"`,
+    );
+    assert.equal(app.asked.length, 0);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a long or odd value is shortened and quoted, not echoed raw', async () => {
+  const app = await spyApp();
+  try {
+    assert.equal(
+      await badRequest(app, `length=${'9'.repeat(500)}`),
+      `length must be a whole number from 2 to 12, not "${'9'.repeat(24)}..."`,
+    );
+    assert.equal(
+      await badRequest(app, 'length=a%0Ab%22c'),
+      'length must be a whole number from 2 to 12, not "a\\nb\\"c"',
+    );
+    const res = await fetch(`${app.base}/gen?c=true&length=a%0Ab`);
+    assert.equal((await res.text()).includes(String.fromCharCode(10)), false, 'one line, as SaMathCLI reads it');
   } finally {
     app.server.close();
   }
@@ -407,7 +450,7 @@ test('a count it cannot honour is a 400 that says why', async () => {
     for (const query of ['count=0', `count=${COUNT_MAX + 1}`, 'count=-2', 'count=2.5', 'count=many', 'count=', 'count=3&count=4']) {
       const res = await fetch(`${app.base}/gen?${query}`);
       assert.equal(res.status, 400, query);
-      assert.deepEqual(await res.json(), { error: `count must be a whole number from 1 to ${COUNT_MAX}` }, query);
+      assert.match((await res.json()).error, new RegExp(`^count (must be a whole number from 1 to ${COUNT_MAX}, not|was sent 2 times)`), query);
     }
     assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
   } finally {
@@ -469,7 +512,7 @@ test('a seed it cannot honour is a 400 that says why', async () => {
     for (const query of ['seed=-1', `seed=${SEED_MAX + 1}`, 'seed=1.5', 'seed=abc', 'seed=', 'seed=1&seed=2']) {
       const res = await fetch(`${app.base}/gen?${query}`);
       assert.equal(res.status, 400, query);
-      assert.deepEqual(await res.json(), { error: `seed must be a whole number from 0 to ${SEED_MAX}` }, query);
+      assert.match((await res.json()).error, new RegExp(`^seed (must be a whole number from 0 to ${SEED_MAX}, not|was sent 2 times)`), query);
     }
     assert.equal((await fetch(`${app.base}/gen?seed=${SEED_MAX}`)).status, 200);
     assert.equal(app.asked.length, 1, 'only the valid request reached the generator');
