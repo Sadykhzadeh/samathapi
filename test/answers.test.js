@@ -150,19 +150,31 @@ test('answermin in the wrong case is named as a misspelling', async () => {
   assert.equal((await res.json()).error, 'unknown parameter "answermin", did you mean answerMin?; unknown parameter "answermax", did you mean answerMax?');
 });
 
-test('a task that comes back with another answer than the one asked for is drawn again', async () => {
-  let call = 0;
+test('the generator is asked for the range, and a task outside it is drawn again', async () => {
+  const asked = [];
   const app = await listen(createApp(readConfig({}), (length, { answer }) => {
-    call++;
-    return call < 3
+    asked.push(answer);
+    return asked.length < 3
       ? { task: [1, '+', 1], answer: 2, quizOptions: [] }
-      : { task: [answer - 1, '+', 1], answer, quizOptions: [] };
+      : { task: [answer[0] - 1, '+', 1], answer: answer[0], quizOptions: [] };
   }));
   try {
-    const task = await (await fetch(`${app.base}/gen?answerMin=40&answerMax=40`)).json();
+    const task = await (await fetch(`${app.base}/gen?answerMin=40&answerMax=45`)).json();
     assert.equal(task.answer, 40);
-    assert.equal(call, 3);
+    assert.deepEqual(asked, [[40, 45], [40, 45], [40, 45]]);
+    await (await fetch(`${app.base}/gen`)).text();
+    assert.equal(asked.at(-1), undefined, 'without a range it is not told one');
   } finally {
     app.server.close();
   }
+});
+
+test('every answer of a wide range turns up, about as often as the others', async () => {
+  // 101 answers is the widest range a request may name.
+  const counts = new Map();
+  for (let i = 0; i < 40; i++) {
+    for (const { answer } of await quiz('answerMin=1&answerMax=101&length=3')) counts.set(answer, (counts.get(answer) ?? 0) + 1);
+  }
+  assert.equal(counts.size, 101);
+  for (const [answer, count] of counts) assert.ok(count > 15 && count < 70, `${answer} came up ${count} times out of 4000`);
 });

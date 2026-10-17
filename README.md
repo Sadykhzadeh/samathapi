@@ -202,7 +202,7 @@ for its own range, and every task draws an answer from it, the ends included:
 
 ```sh
 curl 'http://localhost:3000/gen?answerMin=50&answerMax=100&length=3&seed=7'
-# {"task":[40,"-","(",-24,")","-",14],"answer":50,"quizOptions":[55,50,53,54]}
+# {"task":[470,"/","(",4,"+",1,")"],"answer":94,"quizOptions":[89,90,93,94]}
 ```
 
 The four options stay inside the range, so a pupil who knows it can rule none
