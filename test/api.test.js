@@ -85,8 +85,8 @@ test('a generator that throws is a 500 in the format asked for, not a stack trac
 });
 
 test('every task served works out to its answer', () => {
-  // samathgen 0.1.3 gets about 3% of these wrong on its own, and writes
-  // another few percent as "3*-1*3+20".
+  // samathgen 0.1.3 got about 3% of these wrong on its own, and wrote
+  // another few percent as "3*-1*3+20"; 1.0 gets none of them wrong.
   for (const brackets of [false, true]) {
     for (let i = 0; i < 20000; i++) {
       const { task, answer, quizOptions } = drawSound(mathGen, 2 + (i % 3), { brackets, quizMode: true });
@@ -98,8 +98,9 @@ test('every task served works out to its answer', () => {
 });
 
 test('the longest tasks are served as surely as the shortest', async () => {
-  // samathgen 0.1.3 gets only about one 12-term task in ten right, so a
-  // whole quiz of them needs plenty of redraws.
+  // 12 terms is the longest a request can ask for. samathgen 0.1.3 got only
+  // about one such task in ten right, so a whole quiz of them took plenty of
+  // redraws.
   for (const query of ['length=12', 'length=12&brackets=true', 'length=11', 'length=10']) {
     const res = await fetch(`${base}/gen?c=true&count=${COUNT_MAX}&${query}`);
     assert.equal(res.status, 200, query);
@@ -127,8 +128,8 @@ test('a wrong task is drawn again rather than served', async () => {
 });
 
 test('where the answer falls among the options gives nothing away', async () => {
-  // samathgen 0.1.3 never makes the answer the smallest or the largest of
-  // its options, so picking either middle one was right half the time.
+  // samathgen 0.1.3 never made the answer the smallest or the largest of its
+  // options, so picking either middle one was right half the time.
   const ranks = [0, 0, 0, 0];
   for (let i = 0; i < 20; i++) {
     for (const { answer, quizOptions } of await (await fetch(`${base}/gen?count=${COUNT_MAX}`)).json()) {
@@ -258,9 +259,9 @@ test('brackets in the request overrides the config both ways', async () => {
 });
 
 test('negatives=false keeps every number and every step at 0 or above', async () => {
-  // samathgen 0.1.3 puts a negative number in about one task in four, as
-  // in -29+47, and two in five with brackets; a few more pass below zero on
-  // the way, as in 2-5+15.
+  // Left alone, samathgen puts a negative number in about one task in three
+  // of 3 numbers, as in -29+47, and a few more pass below zero on the way, as
+  // in 2-5+15.
   for (const query of ['length=2', 'length=4&brackets=true', 'length=12', 'length=12&brackets=true']) {
     const res = await fetch(`${base}/gen?negatives=false&count=${COUNT_MAX}&${query}`);
     assert.equal(res.status, 200, query);
