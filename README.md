@@ -49,9 +49,14 @@ one machine rather than numbers between machines.
 Only the exact string `true` turns `c` on; anything else, `false` included,
 returns JSON. Without a `c`, the `Accept` header decides: a client that asks
 for `text/plain` ahead of JSON gets the plain line, so
-`curl -H 'Accept: text/plain' localhost:3000/gen` and `/gen?c=true` are the same
-answer. A browser or `curl` with no header, which accept anything, get JSON.
-Errors follow the same choice, and the answer carries `Vary: Accept`.
+`/gen?c=true` and the request below are the same answer. A browser or `curl`
+with no header, which accept anything, get JSON. Errors follow the same
+choice, and the answer carries `Vary: Accept`.
+
+```sh
+curl -H 'Accept: text/plain' 'http://localhost:3000/gen?seed=2024'
+# -10+1*5*4 11,12,14,10 10
+```
 
 Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
 `405` with an `Allow` header, both as `{"error":"..."}`. The server is plain
