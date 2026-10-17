@@ -650,7 +650,7 @@ test('a parameter that is a typo of a known one is a 400 that suggests the right
 test('a parameter that is no typo of a known one is ignored', async () => {
   const app = await spyApp();
   try {
-    for (const query of ['utm_source=mail', '_=1700000000', 'ref=class4', 'lang=az', 'format=json', 'cb=12', 'x=1&y=2']) {
+    for (const query of ['utm_source=mail', '_=1700000000', 'ref=class4', 'lang=az', 'format=json', 'cb=12', 'x=1&y=2', `${'a'.repeat(15000)}=1`]) {
       assert.equal((await fetch(`${app.base}/gen?${query}`)).status, 200, query);
     }
   } finally {
