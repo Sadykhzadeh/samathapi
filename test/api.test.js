@@ -275,6 +275,38 @@ test('a request can ask for its own length and brackets', async () => {
   }
 });
 
+test('brackets=never reaches the generator as it is, and true and false as booleans', async () => {
+  const app = await spyApp({ brackets: 'true' });
+  try {
+    for (const [value, expected] of [['never', 'never'], ['true', true], ['false', false]]) {
+      await (await fetch(`${app.base}/gen?brackets=${value}`)).text();
+      assert.equal(app.asked.pop().brackets, expected, value);
+    }
+  } finally {
+    app.server.close();
+  }
+});
+
+// Whether a task puts anything but one negative number inside a bracket.
+const hasGroup = (task) => task.some((piece, i) => piece === '(' && !(task[i + 1] < 0 && task[i + 2] === ')'));
+
+test('brackets=never leaves out every group, and false does not', async () => {
+  for (const query of ['', 'length=3', 'length=6', 'length=12']) {
+    for (const negatives of ['true', 'false']) {
+      const tasks = await (await fetch(`${base}/gen?brackets=never&negatives=${negatives}&count=${COUNT_MAX}&${query}`)).json();
+      for (const { task, answer } of tasks) {
+        assert.equal(hasGroup(task), false, task.join(''));
+        if (negatives === 'false') assert.equal(task.includes('('), false, task.join(''));
+        assert.equal(evaluate(task.join(''), { negatives: negatives === 'true' }), answer, task.join(''));
+      }
+    }
+  }
+  // Without the word, a bracket is still put where the order of working needs
+  // one, which is why 'never' is a value of its own.
+  const tasks = await (await fetch(`${base}/gen?brackets=false&length=4&count=${COUNT_MAX}`)).json();
+  assert.ok(tasks.filter(({ task }) => hasGroup(task)).length > 20);
+});
+
 test('brackets in the request overrides the config both ways', async () => {
   const app = await spyApp({ brackets: 'true' });
   try {
@@ -347,9 +379,10 @@ test('a length, brackets or negatives it cannot honour is a 400 that says why', 
       ['length=', 'length must be a whole number from 2 to 12, not ""'],
       ['length=-3', 'length must be a whole number from 2 to 12, not "-3"'],
       ['length=3&length=4', 'length was sent 2 times, send it once'],
-      ['brackets=yes', 'brackets must be true or false, not "yes"'],
-      ['brackets=1', 'brackets must be true or false, not "1"'],
-      ['brackets=TRUE', 'brackets must be true or false, not "TRUE"'],
+      ['brackets=yes', 'brackets must be true, false or never, not "yes"'],
+      ['brackets=1', 'brackets must be true, false or never, not "1"'],
+      ['brackets=TRUE', 'brackets must be true, false or never, not "TRUE"'],
+      ['brackets=Never', 'brackets must be true, false or never, not "Never"'],
       ['negatives=no', 'negatives must be true or false, not "no"'],
       ['negatives=', 'negatives must be true or false, not ""'],
       ['negatives=false&negatives=false', 'negatives was sent 2 times, send it once'],
@@ -371,7 +404,7 @@ test('every parameter that is wrong is named in one answer', async () => {
   try {
     assert.equal(
       await badRequest(app, 'length=99&brackets=maybe&count=0&seed=-1&negatives=false'),
-      'length must be a whole number from 2 to 12, not "99"; brackets must be true or false, not "maybe"; '
+      'length must be a whole number from 2 to 12, not "99"; brackets must be true, false or never, not "maybe"; '
         + `count must be a whole number from 1 to ${COUNT_MAX}, not "0"; seed must be a whole number from 0 to ${SEED_MAX}, not "-1"`,
     );
     assert.equal(app.asked.length, 0);

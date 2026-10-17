@@ -95,7 +95,7 @@ in `(-96)/((52-28)/(-3))`.
 | Parameter | Values | Default |
 | --- | --- | --- |
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
-| `brackets` | `true` or `false` | the `brackets` setting |
+| `brackets` | `true`, `false` or `never` | the `brackets` setting, `true` or `false` |
 | `negatives` | `true` or `false` | the `negatives` setting |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
@@ -126,6 +126,20 @@ met negative numbers, since samathgen puts one in about three tasks in ten at
 3 numbers and one in two at 5. Setting `negatives=false` in the
 environment does the same for every request that does not ask otherwise, so
 a client that never sends it, such as SaMathCLI, gets it too.
+
+`brackets=false` does not mean a task without brackets: it asks for no group
+but a task still gets one where the order of working needs it, as `12-(5+3)`
+does, and so do 38 tasks in 100 of three numbers, 65 of four and 89 of six.
+A class that has not met brackets asks for `brackets=never`, which leaves out
+every group; the only brackets left are those around a negative number, as in
+`7-(-5)`, and `negatives=false` takes those away.
+
+```sh
+curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=false&length=4&seed=4'
+# 30/(15-10)+12 18,19,20,15 18
+curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=never&length=4&seed=4'
+# 30/5+19-7 18,19,20,15 18
+```
 
 ### Answers in a range of your own
 
