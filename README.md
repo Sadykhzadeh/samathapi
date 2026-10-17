@@ -61,7 +61,7 @@ choice, and the answer carries `Vary: Accept, Accept-Encoding`.
 
 ```sh
 curl -H 'Accept: text/plain' 'http://localhost:3000/gen?seed=2024'
-# -10+1*5*4 11,12,14,10 10
+# (-96)/((52-28)/(-3)) 10,15,12,13 12
 ```
 
 Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
@@ -76,19 +76,19 @@ answered with `204`.
 
 ```sh
 curl 'http://localhost:3000/gen?brackets=true&seed=5'
-# {"task":[3,"*",9,"*",2,"/","(4-1)"],"answer":18,"quizOptions":[16,20,18,15]}
+# {"task":["(",2,"+",12,"/",4,")","*",3],"answer":15,"quizOptions":[15,12,10,14]}
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `3*9*2/(4-1)`. |
+| `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `(2+12/4)*3`. |
 | `answer` | What the task works out to, a whole number. |
 | `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. They are four of six numbers in a row, and `answer` is as likely to be the smallest of them as the largest or either between, so a pupil cannot pick it by its size. samathgen gives every task an answer from 10 to 20, or from the range a request asks for with `answerMin` and `answerMax`, so the options stay within that range as well, drawn so that whichever four a pupil sees, each is as likely to be the answer as the others: a pupil who knows the range cannot rule any of them out. |
 
-Read the task by joining it rather than piece by piece: samathgen 0.1.3, which
-is what npm serves, sends a bracketed group as a single string such as
-`"(4-1)"`, where later versions send `"("` and `")"` on their own. A number
-can be negative, as `-10` in `-10+1*5*4`.
+Read the task by joining it rather than piece by piece: samathgen 1.0 sends
+each bracket as a string of its own, `"("` and `")"`, where 0.1.3 sent a bracketed
+group as a single string such as `"(4-1)"`. A number can be negative, as `-96`
+in `(-96)/((52-28)/(-3))`.
 
 `/gen` also takes:
 
@@ -115,14 +115,12 @@ a misspelling of one it does: `bracket=true` is a `400`,
 `unknown parameter "bracket", did you mean brackets?`, rather than a worksheet
 without brackets. A task that cannot be generated is a
 `500` in the same two formats, with the message `could not generate a task`.
-With `brackets=true`, samathgen 0.1.3 puts one or two more numbers inside the
-bracket than `length` asks for.
 
 With `negatives=false` no task has a number below zero in it, and none passes
 below zero on the way to its answer, worked out left to right: `-29+47` and
-`2-5+15` are drawn again, `20-5-3` is served. That is for a class that has not
-met negative numbers, since samathgen 0.1.3 puts one in about a quarter of its
-tasks and two in five with brackets. Setting `negatives=false` in the
+`2-5+15` are never made, `20-5-3` can be. That is for a class that has not
+met negative numbers, since samathgen puts one in about three tasks in ten at
+3 numbers and one in two at 5. Setting `negatives=false` in the
 environment does the same for every request that does not ask otherwise, so
 a client that never sends it, such as SaMathCLI, gets it too.
 
@@ -133,17 +131,14 @@ for its own range, and every task draws an answer from it, the ends included:
 
 ```sh
 curl 'http://localhost:3000/gen?answerMin=50&answerMax=100&length=3&seed=7'
-# {"task":[175,"*",2,"/",7],"answer":50,"quizOptions":[51,52,50,53]}
+# {"task":[40,"-","(",-24,")","-",14],"answer":50,"quizOptions":[55,50,53,54]}
 ```
 
 The four options stay inside the range, so a pupil who knows it can rule none
 of them out, and each is as likely to be the answer as the others. The range
 may not be wider than 100 numbers, which keeps the work of building those
-options small. It starts at 1 because samathgen 0.1.3 takes an answer of 0 to
-mean none, and ends at 500 because with `brackets=true` and two numbers the
-same version takes up to a quarter of a millisecond to find a task for an
-answer near 1000. It goes with `length`, `brackets`, `negatives`, `count` and
-`seed`; the range is part of what a seed names.
+options small, and runs from 1 to 500. It goes with `length`, `brackets`,
+`negatives`, `count` and `seed`; the range is part of what a seed names.
 
 A range of a few numbers has few tasks to give, so a `count` of 100 with
 `answerMin=1&answerMax=1` repeats: the server draws again for a repeat at most
@@ -160,9 +155,9 @@ the saving is 19 round trips on top of that.
 
 ```sh
 curl 'http://localhost:3000/gen?c=true&count=3'
-# 2*1*10 16,20,18,19 20
-# 20-4-1-3 13,12,10,11 12
-# 7*1*3-1 19,17,20,15 20
+# (35-2)/3 12,14,13,11 11
+# 4+(-2)*(-7) 16,18,17,14 18
+# 11+1+3 19,15,18,17 15
 ```
 
 Without a `length`, every task draws its own from the configured range. The
@@ -185,9 +180,9 @@ and after `4294967295` the seed wraps to `0`.
 
 ```sh
 curl 'http://localhost:3000/gen?c=true&count=3&seed=2024'
-# -10+1*5*4 11,12,14,10 10
-# 8*4/2 12,15,14,16 16
-# 9-2+6 10,14,13,11 13
+# (-96)/((52-28)/(-3)) 10,15,12,13 12
+# 17+19-22 14,11,13,10 14
+# 47-(14+14) 18,20,16,19 19
 ```
 
 A seeded task goes through the same check as any other, but is not drawn
@@ -200,22 +195,23 @@ Because a seed names the same answer every time, the server keeps the seeded
 answers it has given (up to 4 MB of them, oldest dropped first) and does not
 draw them again, and sends them with `Cache-Control: public, max-age=3600` and
 an `ETag`; a request with a matching `If-None-Match` is a `304` with no body.
-That is a seeded `count=100` at 35 000 requests per second, where drawing it
-each time gave 5 500, and a seeded 12-term quiz at 28 000 where it gave 240.
+That is a seeded `count=100` at 23 000 requests per second, where drawing it
+each time gave 4 200, and a seeded 12-term quiz with brackets at 18 000 where it
+gave 1 700.
 An answer without a seed is new every time and says `Cache-Control: no-store`.
 
 An answer of 1 KB or more, a `count` of 16 or so, is gzipped for a client whose
 `Accept-Encoding` lists `gzip`, which `curl --compressed` and every browser
-do: 6.6 KB for `count=100` becomes 1.4 KB. A seeded answer is compressed once
+do: 7.3 KB for `count=100` becomes 1.4 KB. A seeded answer is compressed once
 and kept that way, and its gzipped form has an `ETag` of its own. Nothing else
 is compressed, brotli included.
 
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
 its own only at the start or just inside a bracket. A task that fails is
-drawn again. The samathgen release on npm (0.1.3) gets about 3% of its tasks
-wrong and writes another few percent as `3*-1*3+20`; none of those reach a
-client.
+drawn again. samathgen 1.0 promises this itself, where 0.1.3 got about 3% of its
+tasks wrong and wrote another few percent as `3*-1*3+20`; the check stays so
+that a fault in the generator would not reach a client.
 
 ## Configuration
 

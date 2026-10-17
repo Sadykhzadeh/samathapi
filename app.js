@@ -42,19 +42,13 @@ const genNumber = (first, second) => {
   return first + Math.floor(Math.random() * (second - first + 1));
 };
 
-// samathgen 0.1.3, which is what npm serves, gets about 3% of its tasks
-// wrong ("7*2-1*2" reported as 14) and writes another 3.6% in a notation
-// such as "-30+-41+88" or "3*-1*3+20". A pupil answering the first kind
-// is marked wrong for being right. So a task is only served once it works
-// out to its answer by evaluate()'s rules; anything else is drawn again.
-// With the generator's own fix in place this never redraws, and costs one
-// parse per request.
-//
-// The longer the task the more draws that takes: one in two is sound at 6
-// terms, one in ten at 12, where the worst of 100 000 tasks took 106 draws.
-// Keeping negative numbers out as well makes it one in 19 at 12 terms with
-// brackets, worst 196. 500 leaves even that about one chance in 600 billion
-// of a 500.
+// samathgen 0.1.3 got about 3% of its tasks wrong ("7*2-1*2" reported as 14)
+// and wrote another 3.6% in a notation such as "-30+-41+88" or "3*-1*3+20",
+// and a pupil answering the first kind is marked wrong for being right.
+// 1.0 builds every task so that it works out to its answer, and its tests
+// say so, but a task is still only served once it does by evaluate()'s rules;
+// anything else is drawn again. That never redraws now, and costs one parse
+// per task.
 const ATTEMPTS = 500;
 
 const isSound = ({ task, answer }, { negatives, answer: asked }) =>
@@ -76,18 +70,12 @@ const shuffle = (items) => {
   return items;
 };
 
-// samathgen 0.1.3 offers the answer with one option 2 or 3 above it, one 2
-// or 3 below it and a fourth near it, so the answer is never the smallest
-// or the largest of the four and a pupil can rule out two of them without
-// working anything out. The options are drawn here instead: four of six
-// numbers in a row laid over the answer, whose rank among them is drawn
-// first, so it is as likely to be the smallest as the largest or either
-// between, whatever the four look like.
-//
-// That alone still lets a pupil rule options out by size, because every
-// answer comes from one range, 10 to 20 unless the request names its own, and
-// a pupil who has done a few quizzes knows it: of 6, 7, 8 and 10 only 10 can
-// be right. So an answer in the range draws its four from sets that stay
+// samathgen 1.0 draws four of six numbers in a row over the answer, whose
+// rank among them is drawn first, so it is as likely to be the smallest as
+// the largest or either between, whatever the four look like. That alone
+// still lets a pupil rule options out by size, because every answer comes
+// from one range, 10 to 20 unless the request names its own, and a pupil who
+// has done a few quizzes knows it: of 6, 7, 8 and 10 only 10 can be right. So an answer in the range draws its four from sets that stay
 // inside it, each four numbers that fit in six in a row, weighted so that the
 // sets holding any one number weigh 1 in all. A set then comes up as often
 // for each of its four numbers, and seeing it says nothing about which one is
@@ -155,8 +143,7 @@ export const drawOptions = (answer, range = DEFAULT_RANGE) => {
 export const COUNT_MAX = 100;
 
 // The answers a request may ask for: whole numbers from 1 to ANSWER_LIMIT,
-// with at most ANSWER_SPAN between the least and the most. Zero is left out
-// because samathgen 0.1.3 reads an answer of 0 as none, and the span keeps the
+// with at most ANSWER_SPAN between the least and the most. The span keeps the
 // work of making the options give nothing away within a few milliseconds.
 export const ANSWER_LIMIT = 500;
 export const ANSWER_SPAN = 100;
@@ -176,10 +163,11 @@ const mulberry32 = (seed) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-// samathgen 0.1.3 has no seed option, but every number it picks comes from
-// Math.random. So a task is pinned by lending the generator a seeded
-// Math.random for the one synchronous call that builds it - nothing else can
-// run in between - and handing the real one back whatever happens.
+// Everything a task is made of comes from Math.random: the generator draws
+// its seed from it, and so do the length and the options below. So a task is
+// pinned by lending the generator a seeded Math.random for the one
+// synchronous call that builds it - nothing else can run in between - and
+// handing the real one back whatever happens.
 const seeded = (seed, work) => {
   const real = Math.random;
   Math.random = mulberry32(seed);
