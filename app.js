@@ -295,10 +295,19 @@ const drawTasks = (generate, request, config) => {
 const JSON_TYPE = 'application/json; charset=utf-8';
 const TEXT_TYPE = 'text/plain; charset=utf-8';
 
+// The API is public and carries no credentials, so any page may read it, and
+// an error as well as an answer, or a script could not show why it failed.
+// nosniff because a plain-text answer repeats a value from the request.
+const EVERY_ANSWER = {
+  'Access-Control-Allow-Origin': '*',
+  'X-Content-Type-Options': 'nosniff',
+};
+
 const send = (res, status, type, body, headers) => {
   res.writeHead(status, {
     'Content-Type': type,
     'Content-Length': Buffer.byteLength(body),
+    ...EVERY_ANSWER,
     ...headers,
   });
   res.end(body);
@@ -357,7 +366,15 @@ export const createApp = (config, generate = mathGen) => {
     } else if (req.method === 'GET' || req.method === 'HEAD') {
       route(req, res);
     } else if (req.method === 'OPTIONS') {
-      res.writeHead(204, { Allow: ALLOWED });
+      // A browser asks first when a request carries headers of its own, and
+      // is told it may send whichever it named.
+      res.writeHead(204, {
+        Allow: ALLOWED,
+        ...EVERY_ANSWER,
+        'Access-Control-Allow-Methods': ALLOWED,
+        'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'Accept',
+        'Access-Control-Max-Age': '86400',
+      });
       res.end();
     } else {
       send(res, 405, JSON_TYPE, '{"error":"method not allowed"}', { Allow: ALLOWED });
