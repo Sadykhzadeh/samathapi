@@ -16,13 +16,17 @@ const freePort = async () => {
   return port;
 };
 
+// A message to the child makes it behave as if it had been sent SIGTERM,
+// which cannot be sent to a process on Windows.
+const sigtermOnMessage = 'data:text/javascript,process.on("message",()=>process.emit("SIGTERM"))';
+
 // `node .` the way `npm start` runs it, with `env` on top of ours. Resolves
 // once it has printed its address, or with whatever it said if it exited.
 const start = (env) => {
-  const child = spawn(process.execPath, ['.'], {
+  const child = spawn(process.execPath, ['--import', sigtermOnMessage, '.'], {
     cwd: root,
     env: { ...process.env, ...env },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
   const output = { stdout: '', stderr: '' };
   child.stdout.on('data', (chunk) => { output.stdout += chunk; });
@@ -65,4 +69,18 @@ test('a port that is already taken is one clear line and exit code 1', async () 
     first.child.kill();
     await first.exited;
   }
+});
+
+test('SIGTERM stops the server with exit code 0 even with a connection left open', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port) });
+  await server.listening;
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.write('GET /healthz HTTP/1.1\r\nHost: x\r\n\r\n');
+  await once(socket, 'data');
+  server.child.send('stop');
+  assert.equal(await server.exited, 0);
+  assert.match(server.output.stdout, /SIGTERM received/);
+  socket.destroy();
 });
