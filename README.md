@@ -211,6 +211,10 @@ may not be wider than 100 numbers, which keeps the work of building those
 options small, and runs from 0 to 10000. It goes with `length`, `brackets`,
 `negatives`, `count` and `seed`; the range is part of what a seed names.
 
+A range narrower than four answers has no four options inside it, so there they
+fall around the answer, and still stay at 0 or above with `negatives=false` and
+within `max`.
+
 The range may start at 0, as `answerMin=0&answerMax=20` does for a class that
 counts within twenty, and then `6-6` is a task. A range of 0 alone, or a range
 that holds only answers the operators cannot make, is a `400` that says so:
