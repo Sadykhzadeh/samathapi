@@ -154,6 +154,7 @@ test('the generator is asked for the range, and a task outside it is drawn again
   const asked = [];
   const app = await listen(createApp(readConfig({}), (length, { answer }) => {
     asked.push(answer);
+    if (answer === undefined) return { task: [1, '+', 1], answer: 2, quizOptions: [] };
     return asked.length < 3
       ? { task: [1, '+', 1], answer: 2, quizOptions: [] }
       : { task: [answer[0] - 1, '+', 1], answer: answer[0], quizOptions: [] };

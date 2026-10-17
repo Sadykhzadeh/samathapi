@@ -694,14 +694,12 @@ test('task i of a count is the task for seed + i, and the seed wraps at 32 bits'
   assert.deepEqual(wrapped[1], await (await fetch(`${base}/gen?seed=0`)).json());
 });
 
-test('a seeded task is still checked, and Math.random is handed back', async (t) => {
-  const real = Math.random;
+test('a seeded task is still checked', async (t) => {
   for (let seed = 0; seed < 120; seed++) {
     const { task, answer, quizOptions } = await (await fetch(`${base}/gen?seed=${seed}&length=${2 + (seed % 5)}`)).json();
     assert.equal(evaluate(task.join('')), answer, `seed ${seed}`);
     assert.ok(quizOptions.includes(answer));
   }
-  assert.equal(Math.random, real);
 
   t.mock.method(console, 'error', () => {});
   const failing = await listen(createApp(readConfig({}), () => {
@@ -712,7 +710,78 @@ test('a seeded task is still checked, and Math.random is handed back', async (t)
   } finally {
     failing.server.close();
   }
-  assert.equal(Math.random, real, 'still the real one after the generator threw');
+
+  // A seed names one task, so a wrong one is not asked for again: it would
+  // only come back the same.
+  let calls = 0;
+  const wrong = await listen(createApp(readConfig({}), () => {
+    calls++;
+    return { task: [2, '+', 2], answer: 5, quizOptions: [] };
+  }));
+  try {
+    assert.equal((await fetch(`${wrong.base}/gen?seed=1`)).status, 500);
+    assert.equal(calls, 1);
+  } finally {
+    wrong.server.close();
+  }
+});
+
+test('the generator is handed the seed of each task, and none for an unseeded one', async () => {
+  const seen = [];
+  const app = await listen(createApp(readConfig({}), (length, options) => {
+    seen.push({ length, seed: options.seed });
+    return { task: [seen.length, '+', 1], answer: seen.length + 1, quizOptions: [] };
+  }));
+  try {
+    await (await fetch(`${app.base}/gen?seed=10&count=3&length=4`)).text();
+    assert.deepEqual(seen.splice(0), [10, 11, 12].map((seed) => ({ length: 4, seed })));
+    await (await fetch(`${app.base}/gen?seed=${SEED_MAX}&count=2&length=4`)).text();
+    assert.deepEqual(seen.splice(0).map(({ seed }) => seed), [SEED_MAX, 0], 'the seed wraps at 32 bits');
+    await (await fetch(`${app.base}/gen?length=4`)).text();
+    assert.deepEqual(seen.splice(0), [{ length: 4, seed: undefined }]);
+    // The length of a task without one is a function of its seed.
+    await (await fetch(`${app.base}/gen?seed=77&count=40`)).text();
+    const first = seen.splice(0);
+    const other = await listen(createApp(readConfig({}), (length, options) => {
+      seen.push({ length, seed: options.seed });
+      return { task: [seen.length + 100, '+', 1], answer: seen.length + 101, quizOptions: [] };
+    }));
+    try {
+      await (await fetch(`${other.base}/gen?seed=77&count=40`)).text();
+    } finally {
+      other.server.close();
+    }
+    assert.deepEqual(seen.splice(0), first);
+    assert.ok(new Set(first.map(({ length }) => length)).size > 1, 'the lengths differ from task to task');
+  } finally {
+    app.server.close();
+  }
+});
+
+test('a seed names the same tasks whatever Math.random says', async (t) => {
+  const queries = [
+    'seed=42', 'seed=42&length=5&brackets=true', 'seed=7&count=10&answerMin=50&answerMax=100',
+    'seed=9&count=5&operators=add,subtract&max=20&c=true', 'seed=3&count=20',
+  ];
+  const ordinary = await listen(createApp(readConfig({})));
+  const bodies = [];
+  try {
+    for (const query of queries) bodies.push(await (await fetch(`${ordinary.base}/gen?${query}`)).text());
+  } finally {
+    ordinary.server.close();
+  }
+  // A fresh server, with nothing kept from the first, asked while every call
+  // to Math.random gives the same number.
+  const fresh = await listen(createApp(readConfig({})));
+  const random = t.mock.method(Math, 'random', () => 0.123);
+  try {
+    for (const [i, query] of queries.entries()) {
+      assert.equal(await (await fetch(`${fresh.base}/gen?${query}`)).text(), bodies[i], query);
+    }
+  } finally {
+    random.mock.restore();
+    fresh.server.close();
+  }
 });
 
 test('a seed it cannot honour is a 400 that says why', async () => {

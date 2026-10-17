@@ -60,8 +60,8 @@ with no header, which accept anything, get JSON. Errors follow the same
 choice, and the answer carries `Vary: Accept, Accept-Encoding`.
 
 ```sh
-curl -H 'Accept: text/plain' 'http://localhost:3000/gen?seed=2024'
-# (-96)/((52-28)/(-3)) 10,15,12,13 12
+curl -H 'Accept: text/plain' 'http://localhost:3000/gen?seed=2041'
+# 14-3 15,12,14,11 11
 ```
 
 Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
@@ -75,20 +75,20 @@ answered with `204`.
 ### The task as JSON
 
 ```sh
-curl 'http://localhost:3000/gen?brackets=true&seed=5'
-# {"task":["(",2,"+",12,"/",4,")","*",3],"answer":15,"quizOptions":[15,12,10,14]}
+curl 'http://localhost:3000/gen?brackets=true&negatives=false&seed=5'
+# {"task":[20,"*","(",5,"+",2,")","/",10],"answer":14,"quizOptions":[16,17,14,12]}
 ```
 
 | Field | Meaning |
 | --- | --- |
-| `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `(2+12/4)*3`. |
+| `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `20*(5+2)/10`. |
 | `answer` | What the task works out to, a whole number. |
 | `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. They are four of six numbers in a row, and `answer` is as likely to be the smallest of them as the largest or either between, so a pupil cannot pick it by its size. samathgen gives every task an answer from 10 to 20, or from the range a request asks for with `answerMin` and `answerMax`, so the options stay within that range as well, drawn so that whichever four a pupil sees, each is as likely to be the answer as the others: a pupil who knows the range cannot rule any of them out. |
 
 Read the task by joining it rather than piece by piece: samathgen 1.0 sends
 each bracket as a string of its own, `"("` and `")"`, where 0.1.3 sent a bracketed
-group as a single string such as `"(4-1)"`. A number can be negative, as `-96`
-in `(-96)/((52-28)/(-3))`.
+group as a single string such as `"(4-1)"`. A number can be negative, as `-3`
+is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
 
 `/gen` also takes:
 
@@ -137,10 +137,10 @@ every group; the only brackets left are those around a negative number, as in
 `7-(-5)`, and `negatives=false` takes those away.
 
 ```sh
-curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=false&length=4&seed=4'
-# 30/(15-10)+12 18,19,20,15 18
-curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=never&length=4&seed=4'
-# 30/5+19-7 18,19,20,15 18
+curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=false&negatives=false&length=4&seed=5'
+# 20*(5+2)/10 15,14,11,16 14
+curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=never&negatives=false&length=4&seed=5'
+# 84*10/6/10 15,14,11,16 14
 ```
 
 ### Numbers that stay small
@@ -154,10 +154,10 @@ negatives or brackets. With `max=20` none of them does.
 
 ```sh
 curl 'http://localhost:3000/gen?c=true&count=4&length=3&max=20&negatives=false&brackets=never&seed=1'
-# 19-3*3 10,11,13,12 10
-# 20/10*5 10,12,14,11 10
-# 2+4*4 17,18,13,15 18
-# 9-8+17 18,19,20,15 18
+# 8+2+3 15,13,12,10 13
+# 14/2*2 14,16,12,13 14
+# 16/2+9 19,20,18,17 17
+# 20/4*2 15,14,10,11 10
 ```
 
 The answers still come from 10 to 20, unless `max` is below 20, when they come
@@ -175,13 +175,13 @@ four, and two tasks in three of three numbers do use `*` or `/`.
 
 ```sh
 curl 'http://localhost:3000/gen?c=true&count=3&length=3&operators=add,subtract&max=20&negatives=false&brackets=never&seed=7'
-# 6+14-1 14,16,18,19 19
-# 5+6+1 10,15,12,11 12
-# 12+7-1 20,18,19,17 18
-curl 'http://localhost:3000/gen?c=true&count=3&length=2&operators=multiply&seed=2024'
-# 5*2 10,12,14,13 10
-# 7*2 14,12,15,11 14
-# 8*2 19,14,16,18 16
+# 7+11-5 13,11,12,10 13
+# 7+11-1 18,16,14,17 17
+# 2+15-1 16,15,13,17 16
+curl 'http://localhost:3000/gen?c=true&count=3&length=2&operators=multiply&negatives=false&seed=2041'
+# 5*2 12,11,10,13 10
+# 5*3 15,16,12,11 15
+# 4*3 11,10,14,12 12
 ```
 
 Every answer is still from the range, and a range has only so many answers a
@@ -202,7 +202,7 @@ for its own range, and every task draws an answer from it, the ends included:
 
 ```sh
 curl 'http://localhost:3000/gen?answerMin=50&answerMax=100&length=3&seed=7'
-# {"task":[470,"/","(",4,"+",1,")"],"answer":94,"quizOptions":[89,90,93,94]}
+# {"task":[132,"/","(",7,"-",5,")"],"answer":66,"quizOptions":[66,62,63,61]}
 ```
 
 The four options stay inside the range, so a pupil who knows it can rule none
@@ -244,16 +244,16 @@ answers quickly, with a repeat or two.
 ### The same quiz twice
 
 With a `seed` a request gives the same answer every time, so a teacher can
-hand a class one quiz and everyone's `?seed=2024` is the same set of
+hand a class one quiz and everyone's `?seed=2041` is the same set of
 questions. Task `i` of a `count` is exactly the task a request for
 `seed + i` gives, so a worksheet can be rerun, split or resumed from its seed,
 and after `4294967295` the seed wraps to `0`.
 
 ```sh
-curl 'http://localhost:3000/gen?c=true&count=3&seed=2024'
-# (-96)/((52-28)/(-3)) 10,15,12,13 12
-# 17+19-22 14,11,13,10 14
-# 47-(14+14) 18,20,16,19 19
+curl 'http://localhost:3000/gen?c=true&count=3&seed=2041'
+# 14-3 15,12,14,11 11
+# 2+19-6 14,15,10,11 15
+# 117/9 15,11,10,13 13
 ```
 
 A seeded task goes through the same check as any other, but is not drawn
