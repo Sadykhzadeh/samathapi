@@ -327,14 +327,14 @@ const wantsText = (query, accept) => {
 const cliLine = ({ task, answer, quizOptions }) =>
   `${task.join('')} ${quizOptions.join(',')} ${answer}`;
 
-// The generator is still asked for options of its own, which are replaced:
-// the tasks a seed gives depend on every number it draws.
+// The generator is not asked for quiz options: they are drawn below, from the
+// range the answer comes from, which it knows nothing about.
 // With an answer range each task is asked for an answer drawn from it, and
 // one that comes back with another is drawn again.
 const drawTask = (generate, request, config) => {
   const { answers } = request;
   const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo);
-  const options = { brackets: request.brackets, negatives: request.negatives, quizMode: true };
+  const options = { brackets: request.brackets, negatives: request.negatives };
   if (answers) options.answer = genNumber(answers.min, answers.max);
   const result = drawSound(generate, length, options);
   return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? DEFAULT_RANGE) };
