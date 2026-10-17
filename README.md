@@ -52,6 +52,10 @@ Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
 `405` with an `Allow` header, both as `{"error":"..."}`. The server is plain
 `node:http`, with no framework between it and the generator.
 
+Every answer, an error too, carries `Access-Control-Allow-Origin: *`, so a page
+on any origin can call the API from the browser, and a preflight `OPTIONS` is
+answered with `204`.
+
 ### The task as JSON
 
 ```sh

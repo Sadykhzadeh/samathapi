@@ -642,3 +642,40 @@ test('a parameter that is no typo of a known one is ignored', async () => {
     app.server.close();
   }
 });
+
+test('every answer, errors included, may be read from a page on another origin', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const broken = await listen(createApp(null));
+  try {
+    for (const [method, url] of [
+      ['GET', `${base}/`], ['GET', `${base}/healthz`], ['GET', `${base}/gen`], ['GET', `${base}/gen?c=true&count=3`],
+      ['HEAD', `${base}/gen`], ['GET', `${base}/gen?length=99`], ['GET', `${base}/nope`], ['POST', `${base}/gen`],
+      ['GET', `${broken.base}/gen`],
+    ]) {
+      const res = await fetch(url, { method });
+      assert.equal(res.headers.get('access-control-allow-origin'), '*', `${method} ${url} ${res.status}`);
+      assert.equal(res.headers.get('x-content-type-options'), 'nosniff', `${method} ${url}`);
+      await res.text();
+    }
+  } finally {
+    broken.server.close();
+  }
+});
+
+test('a preflight is answered with the methods and the headers asked about', async () => {
+  const res = await fetch(`${base}/gen`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: 'https://class.example',
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': 'x-class, accept',
+    },
+  });
+  assert.equal(res.status, 204);
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  assert.equal(res.headers.get('access-control-allow-methods'), 'GET, HEAD, OPTIONS');
+  assert.equal(res.headers.get('access-control-allow-headers'), 'x-class, accept');
+  assert.equal(res.headers.get('access-control-max-age'), '86400');
+  const plain = await fetch(`${base}/gen`, { method: 'OPTIONS' });
+  assert.equal(plain.headers.get('access-control-allow-headers'), 'Accept');
+});
