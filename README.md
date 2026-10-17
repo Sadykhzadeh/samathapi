@@ -166,6 +166,12 @@ That is a seeded `count=100` at 35 000 requests per second, where drawing it
 each time gave 5 500, and a seeded 12-term quiz at 28 000 where it gave 240.
 An answer without a seed is new every time and says `Cache-Control: no-store`.
 
+An answer of 1 KB or more, a `count` of 16 or so, is gzipped for a client whose
+`Accept-Encoding` lists `gzip`, which `curl --compressed` and every browser
+do: 6.6 KB for `count=100` becomes 1.4 KB. A seeded answer is compressed once
+and kept that way, and its gzipped form has an `ETag` of its own. Nothing else
+is compressed, brotli included.
+
 Every task is checked before it is served: it has to work out to its answer
 with whole numbers only, `*` and `/` before `+` and `-`, and a minus sign of
 its own only at the start or just inside a bracket. A task that fails is

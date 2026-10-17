@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import http from 'node:http';
+import { gzipSync } from 'node:zlib';
 import { mathGen } from 'samathgen';
 import { createCache } from './cache.js';
 import { evaluate } from './evaluate.js';
@@ -354,6 +355,19 @@ export const CACHE_BYTES = 4 * 2 ** 20;
 // asking. Upgrading samathgen can change what a seed names, so not for ever.
 const SEEDED_CACHE_CONTROL = 'public, max-age=3600';
 
+// Below this a body is not worth compressing: it already fits a packet.
+const GZIP_FROM = 1024;
+const GZIPPED = { 'Content-Encoding': 'gzip' };
+const VARY = 'Accept, Accept-Encoding';
+
+// Whether an Accept-Encoding header lists gzip with a q above 0.
+const acceptsGzip = (header) => header !== undefined && header.split(',').some((part) => {
+  const [name, ...params] = part.split(';');
+  if (name.trim().toLowerCase() !== 'gzip') return false;
+  const q = params.map((param) => param.trim().toLowerCase()).find((param) => param.startsWith('q='));
+  return q === undefined || Number(q.slice(2)) > 0;
+});
+
 const etagOf = (body) => `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`;
 
 // Whether an If-None-Match header names this tag, weak or not, or anything.
@@ -371,9 +385,10 @@ export const createApp = (config, generate = mathGen) => {
   const gen = (req, res, query) => {
     const asText = wantsText(query, req.headers.accept);
     const type = asText ? TEXT_TYPE : JSON_TYPE;
-    // The format depends on the Accept header unless `c` is given, which a
-    // cache between here and the client has to know.
-    const answer = (status, body, headers) => send(res, status, type, body, { Vary: 'Accept', ...headers });
+    // The format depends on the Accept header unless `c` is given, and the
+    // encoding on Accept-Encoding, which a cache between here and the client
+    // has to know.
+    const answer = (status, body, headers) => send(res, status, type, body, { Vary: VARY, ...headers });
     // An error comes in the format the request asked for, as the bare
     // message for c=true and as {"error": "..."} otherwise.
     const fail = (status, message) => answer(status, asText ? message : JSON.stringify({ error: message }));
@@ -404,14 +419,26 @@ export const createApp = (config, generate = mathGen) => {
       if (key !== undefined) cache.set(key, entry);
     }
 
+    // Compressed once for a seeded answer, which is asked for again, and fast
+    // for the others. A compressed body is a different representation, so it
+    // has a tag of its own.
+    const packed = entry.body.length >= GZIP_FROM && acceptsGzip(req.headers['accept-encoding']);
     if (key === undefined) {
       // Every unseeded answer is new; nothing may hold on to it.
-      answer(200, entry.body, { 'Cache-Control': 'no-store' });
-    } else if (matches(req.headers['if-none-match'], entry.etag)) {
-      res.writeHead(304, { ETag: entry.etag, 'Cache-Control': SEEDED_CACHE_CONTROL, Vary: 'Accept', ...EVERY_ANSWER });
+      answer(200, packed ? gzipSync(entry.body, { level: 1 }) : entry.body, {
+        'Cache-Control': 'no-store',
+        ...(packed && GZIPPED),
+      });
+      return;
+    }
+    const body = packed ? (entry.gzip ??= gzipSync(entry.body)) : entry.body;
+    const etag = packed ? `${entry.etag.slice(0, -1)}-gzip"` : entry.etag;
+    const headers = { ETag: etag, 'Cache-Control': SEEDED_CACHE_CONTROL, ...(packed && GZIPPED) };
+    if (matches(req.headers['if-none-match'], etag)) {
+      res.writeHead(304, { Vary: VARY, ...EVERY_ANSWER, ...headers });
       res.end();
     } else {
-      answer(200, entry.body, { ETag: entry.etag, 'Cache-Control': SEEDED_CACHE_CONTROL });
+      answer(200, body, headers);
     }
   };
 

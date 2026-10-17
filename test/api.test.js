@@ -709,8 +709,8 @@ test('c decides over Accept, and an error follows the same format', async () => 
   assert.equal((await list.text()).trim().split('\n').length, 4);
 });
 
-test('the answer to /gen says it varies with Accept', async () => {
+test('the answer to /gen says it varies with Accept and Accept-Encoding', async () => {
   for (const query of ['', '?c=true', '?length=99', '?seed=1']) {
-    assert.equal((await fetch(`${base}/gen${query}`)).headers.get('vary'), 'Accept', query);
+    assert.equal((await fetch(`${base}/gen${query}`)).headers.get('vary'), 'Accept, Accept-Encoding', query);
   }
 });
