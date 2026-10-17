@@ -84,11 +84,14 @@ can be negative, as `-10` in `-10+1*5*4`.
 curl 'http://localhost:3000/gen?length=6&brackets=true'
 ```
 
-A value outside those is answered with `400` and the reason, as
-`{"error":"length must be a whole number from 2 to 12"}`, or as the bare
-message with `c=true`. A task that cannot be generated is a `500` in the same
-two formats, with the message `could not generate a task`. With `brackets=true`, samathgen 0.1.3 puts one or two
-more numbers inside the bracket than `length` asks for.
+A value outside those is answered with `400`, what is wrong and what was
+sent, as `{"error":"length must be a whole number from 2 to 12, not \"40\""}`,
+or as the bare message with `c=true`. Every parameter that is wrong is named in
+the one answer, separated by `;`, so a request is fixed in one go, and a
+parameter sent twice is refused as well. A task that cannot be generated is a
+`500` in the same two formats, with the message `could not generate a task`.
+With `brackets=true`, samathgen 0.1.3 puts one or two more numbers inside the
+bracket than `length` asks for.
 
 With `negatives=false` no task has a number below zero in it, and none passes
 below zero on the way to its answer, worked out left to right: `-29+47` and
