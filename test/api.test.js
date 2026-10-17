@@ -362,7 +362,7 @@ test('a long or odd value is shortened and quoted, not echoed raw', async () => 
       'length must be a whole number from 2 to 12, not "a\\nb\\"c"',
     );
     const res = await fetch(`${app.base}/gen?c=true&length=a%0Ab`);
-    assert.equal((await res.text()).includes(String.fromCharCode(10)), false, 'one line, as SaMathCLI reads it');
+    assert.equal((await res.text()).includes('\n'), false, 'one line, as SaMathCLI reads it');
   } finally {
     app.server.close();
   }
@@ -678,4 +678,39 @@ test('a preflight is answered with the methods and the headers asked about', asy
   assert.equal(res.headers.get('access-control-max-age'), '86400');
   const plain = await fetch(`${base}/gen`, { method: 'OPTIONS' });
   assert.equal(plain.headers.get('access-control-allow-headers'), 'Accept');
+});
+
+test('Accept: text/plain asks for the CLI line when c does not say', async () => {
+  const text = (accept) => fetch(`${base}/gen?seed=9`, { headers: { Accept: accept } });
+  for (const accept of ['text/plain', 'text/*', 'text/plain, application/json;q=0.5', 'application/json;q=0.1, text/plain', 'TEXT/PLAIN']) {
+    const res = await text(accept);
+    assert.match(res.headers.get('content-type'), /^text\/plain/, accept);
+    assert.match(await res.text(), CLI_LINE, accept);
+  }
+  for (const accept of [
+    'application/json', '*/*', 'text/plain;q=0.5, application/json', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'text/plain, application/json', 'text/plain;q=abc', 'image/png', '',
+  ]) {
+    const res = await text(accept);
+    assert.match(res.headers.get('content-type'), /^application\/json/, accept);
+    assert.ok((await res.json()).task, accept);
+  }
+  assert.match((await fetch(`${base}/gen?seed=9`)).headers.get('content-type'), /^application\/json/, 'no Accept at all');
+});
+
+test('c decides over Accept, and an error follows the same format', async () => {
+  const withAccept = (query, accept) => fetch(`${base}/gen?${query}`, { headers: { Accept: accept } });
+  assert.match((await withAccept('c=false', 'text/plain')).headers.get('content-type'), /^application\/json/);
+  assert.match((await withAccept('c=true', 'application/json')).headers.get('content-type'), /^text\/plain/);
+  const error = await withAccept('length=99', 'text/plain');
+  assert.equal(error.status, 400);
+  assert.equal(await error.text(), 'length must be a whole number from 2 to 12, not "99"');
+  const list = await withAccept('count=4', 'text/plain');
+  assert.equal((await list.text()).trim().split('\n').length, 4);
+});
+
+test('the answer to /gen says it varies with Accept', async () => {
+  for (const query of ['', '?c=true', '?length=99', '?seed=1']) {
+    assert.equal((await fetch(`${base}/gen${query}`)).headers.get('vary'), 'Accept', query);
+  }
 });
