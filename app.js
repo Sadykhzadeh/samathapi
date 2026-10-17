@@ -1,9 +1,11 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import http from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { mathGen } from 'samathgen';
 import { createCache } from './cache.js';
 import { evaluate } from './evaluate.js';
+import { buildSpec } from './openapi.js';
 
 // Env values are strings and every non-empty string is truthy, so only the
 // exact string "true" counts as yes.
@@ -343,6 +345,8 @@ const send = (res, status, type, body, headers) => {
   res.end(body);
 };
 
+const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+
 const ALLOWED = 'GET, HEAD, OPTIONS';
 
 // What a server keeps of the seeded answers it has given. A seed names the
@@ -381,6 +385,14 @@ const matches = (header, etag) => header !== undefined
 // back is a plain http.Server, not yet listening.
 export const createApp = (config, generate = mathGen) => {
   const cache = createCache(CACHE_BYTES);
+  const spec = JSON.stringify(buildSpec({
+    version,
+    lengthMin: LENGTH_MIN,
+    lengthMax: LENGTH_MAX,
+    countMax: COUNT_MAX,
+    seedMax: SEED_MAX,
+    config,
+  }));
 
   const gen = (req, res, query) => {
     const asText = wantsText(query, req.headers.accept);
@@ -445,6 +457,7 @@ export const createApp = (config, generate = mathGen) => {
   const routes = new Map(Object.entries({
     '/': (req, res) => send(res, 200, TEXT_TYPE, 'Hello World'),
     '/healthz': (req, res) => send(res, 200, JSON_TYPE, '{"ok":true}', { 'Cache-Control': 'no-store' }),
+    '/openapi.json': (req, res) => send(res, 200, JSON_TYPE, spec, { 'Cache-Control': 'public, max-age=3600' }),
     '/gen': (req, res) => gen(req, res, readQuery(req.url)),
   }));
 

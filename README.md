@@ -43,6 +43,7 @@ one machine rather than numbers between machines.
 | `GET /` | `Hello World` |
 | `GET /healthz` | `{"ok":true}` |
 | `GET /gen` | the full task as JSON |
+| `GET /openapi.json` | the [OpenAPI](https://spec.openapis.org/oas/v3.0.3) description of all of this, with the limits and defaults of the running server |
 | `GET /gen?c=true` | plain text `<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>`, the shape [SaMathCLI](https://got.az/azer/samathcli) parses |
 
 Only the exact string `true` turns `c` on; anything else, `false` included,
