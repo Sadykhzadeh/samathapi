@@ -37,9 +37,9 @@ export const readConfig = (env) => ({
   port: toPort(env.PORT),
 });
 
-const genNumber = (first, second) => {
+const genNumber = (first, second, random = Math.random) => {
   [first, second] = [Math.min(first, second), Math.max(second, first)];
-  return first + Math.floor(Math.random() * (second - first + 1));
+  return first + Math.floor(random() * (second - first + 1));
 };
 
 // samathgen 0.1.3 got about 3% of its tasks wrong ("7*2-1*2" reported as 14)
@@ -57,16 +57,18 @@ const isSound = ({ task, answer }, { negatives, answer: asked }) =>
   && (asked === undefined || (answer >= asked[0] && answer <= asked[1]));
 
 export const drawSound = (generate, length, options) => {
-  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+  // A seed names one task, so asking again would only give the same one.
+  const attempts = options.seed === undefined ? ATTEMPTS : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const result = generate(length, options);
     if (isSound(result, options)) return result;
   }
   return null;
 };
 
-const shuffle = (items) => {
+const shuffle = (items, random) => {
   for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(random() * (i + 1));
     [items[i], items[j]] = [items[j], items[i]];
   }
   return items;
@@ -134,16 +136,17 @@ const defaultRange = (max) => (max === undefined || max >= 20
   ? DEFAULT_RANGE
   : { min: Math.floor((max + 1) / 2), max });
 
-export const drawOptions = (answer, range = DEFAULT_RANGE) => {
+// `random` is Math.random unless the options of a seeded task are being drawn.
+export const drawOptions = (answer, range = DEFAULT_RANGE, random = Math.random) => {
   const sets = optionSetsFor(range).get(answer);
   if (sets) {
-    let left = Math.random();
+    let left = random();
     const set = sets.find(({ weight }) => (left -= weight) < 0) ?? sets.at(-1);
-    return shuffle([...set.numbers]);
+    return shuffle([...set.numbers], random);
   }
-  const rank = Math.floor(Math.random() * 4);
-  const pattern = shuffle([0, 1, 2, 3, 4, 5]).slice(0, 4).sort((a, b) => a - b);
-  return shuffle(pattern.map((place) => answer + place - pattern[rank]));
+  const rank = Math.floor(random() * 4);
+  const pattern = shuffle([0, 1, 2, 3, 4, 5], random).slice(0, 4).sort((a, b) => a - b);
+  return shuffle(pattern.map((place) => answer + place - pattern[rank]), random);
 };
 
 // samathgen throws a TypeError for an option it does not have or a value of
@@ -186,34 +189,20 @@ export const OPERATOR_NAMES = { add: '+', subtract: '-', multiply: '*', divide: 
 export const MAX_LEAST = 10;
 export const MAX_MOST = 10000;
 
-// A seed is 32 bits wide, which is all the generator below can use.
+// A seed is a 32-bit number, which is what the API has always taken; samathgen
+// takes more, but a seed past this is not one a request may name.
 export const SEED_MAX = 2 ** 32 - 1;
 
 const wholeNumber = (value) =>
   typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : NaN;
 
-// mulberry32: a small generator with a 32-bit state, plenty for picking
-// numbers for a quiz and the same on every machine.
+// mulberry32: a small generator with a 32-bit state, plenty for picking the
+// length and the options of a seeded task and the same on every machine.
 const mulberry32 = (seed) => () => {
   seed = (seed + 0x6d2b79f5) | 0;
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
-// Everything a task is made of comes from Math.random: the generator draws
-// its seed from it, and so do the length and the options below. So a task is
-// pinned by lending the generator a seeded Math.random for the one
-// synchronous call that builds it - nothing else can run in between - and
-// handing the real one back whatever happens.
-const seeded = (seed, work) => {
-  const real = Math.random;
-  Math.random = mulberry32(seed);
-  try {
-    return work();
-  } finally {
-    Math.random = real;
-  }
 };
 
 // What a request asks for. A value that is given but unusable is a 400 naming
@@ -395,15 +384,22 @@ const cliLine = ({ task, answer, quizOptions }) =>
 // With an answer range the generator draws each task's answer from it, the
 // ends included, among the answers the other options can build; one that
 // comes back outside it is drawn again.
-const drawTask = (generate, request, config) => {
+//
+// A seeded task is pinned by handing the seed to the generator. What the
+// server picks itself, the length when the request has none and the options,
+// comes from a generator of its own that the same seed starts, so the same
+// seed is the same task and Math.random has no part in it.
+const drawTask = (generate, request, config, seed) => {
   const { answers } = request;
-  const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo);
+  const random = seed === undefined ? Math.random : mulberry32(seed);
+  const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo, random);
   const options = { brackets: request.brackets, negatives: request.negatives };
+  if (seed !== undefined) options.seed = seed;
   if (request.operators) options.operators = request.operators;
   if (request.max !== undefined) options.max = request.max;
   if (answers) options.answer = [answers.min, answers.max];
   const result = drawSound(generate, length, options);
-  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max)) };
+  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max), random) };
 };
 
 // A quiz asks each question once, so a task it already holds is drawn again,
@@ -433,7 +429,7 @@ const drawTasks = (generate, request, config) => {
   for (let i = 0; i < (request.count ?? 1); i++) {
     const result = request.seed === undefined
       ? drawFresh(generate, request, config, asked, budget)
-      : seeded((request.seed + i) % (SEED_MAX + 1), () => drawTask(generate, request, config));
+      : drawTask(generate, request, config, (request.seed + i) % (SEED_MAX + 1));
     if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
     asked.add(result.task.join(''));
     tasks.push(result);
