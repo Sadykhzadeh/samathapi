@@ -138,15 +138,28 @@ const defaultRange = (max) => (max === undefined || max >= 20
   : { min: Math.floor((max + 1) / 2), max });
 
 // `random` is Math.random unless the options of a seeded task are being drawn.
-export const drawOptions = (answer, range = DEFAULT_RANGE, random = Math.random) => {
+//
+// The sets keep every option inside a range of four answers or more. Around
+// an answer of a narrower range there is no such set, and the four fall in the
+// window alone, which has no idea of the zero a class without negative
+// numbers stops at or of the max a task is kept to. `floor` and `ceiling` say
+// where the window must stop, and the answer then takes the places in it that
+// have room, each as likely as the others, as samathgen does near its ends.
+export const drawOptions = (answer, range = DEFAULT_RANGE, random = Math.random, { floor = -Infinity, ceiling = Infinity } = {}) => {
   const sets = optionSetsFor(range).get(answer);
   if (sets) {
     let left = random();
     const set = sets.find(({ weight }) => (left -= weight) < 0) ?? sets.at(-1);
     return shuffle([...set.numbers], random);
   }
-  const rank = Math.floor(random() * 4);
-  const pattern = shuffle([0, 1, 2, 3, 4, 5], random).slice(0, 4).sort((a, b) => a - b);
+  const below = answer - floor;
+  const above = ceiling - answer;
+  const fewest = 3 - Math.min(above, 3);
+  const rank = fewest + Math.floor(random() * (Math.min(below, 3) - fewest + 1));
+  let pattern;
+  do {
+    pattern = shuffle([0, 1, 2, 3, 4, 5], random).slice(0, 4).sort((a, b) => a - b);
+  } while (pattern[rank] - pattern[0] > below || pattern[3] - pattern[rank] > above);
   return shuffle(pattern.map((place) => answer + place - pattern[rank]), random);
 };
 
@@ -383,6 +396,10 @@ const wantsText = (query, accept) => {
 const cliLine = ({ task, answer, quizOptions }) =>
   `${task.join('')} ${quizOptions.join(',')} ${answer}`;
 
+// How far the options of an answer may go: not below 0 without negatives, and
+// not past the max, which is MAX_MOST when the request names none.
+const room = ({ negatives, max }) => ({ floor: negatives ? -Infinity : 0, ceiling: max ?? MAX_MOST });
+
 // The generator is not asked for quiz options: they are drawn below, from the
 // range the answer comes from, which it knows nothing about.
 // With an answer range the generator draws each task's answer from it, the
@@ -403,7 +420,7 @@ const drawTask = (generate, request, config, seed) => {
   if (request.max !== undefined) options.max = request.max;
   if (answers) options.answer = [answers.min, answers.max];
   const result = drawSound(generate, length, options);
-  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max), random) };
+  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max), random, room(request)) };
 };
 
 // A quiz asks each question once, so a task it already holds is drawn again,

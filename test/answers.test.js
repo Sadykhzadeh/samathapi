@@ -128,6 +128,38 @@ test('a range too narrow for four options still gets four around the answer', ()
   }
 });
 
+test('the options of a narrow range stay above 0 without negatives and within max', async () => {
+  const check = (answer, options, floor, ceiling) => {
+    assert.equal(new Set(options).size, 4, `${options}`);
+    assert.ok(options.includes(answer), `${answer} not in ${options}`);
+    assert.ok(options.every((o) => o >= floor && o <= ceiling), `${options} for ${answer} outside ${floor} to ${ceiling}`);
+    assert.ok(options.every((o) => Math.abs(o - answer) <= 5), `${options} for ${answer}`);
+  };
+  for (let i = 0; i < 2000; i++) {
+    for (const answer of [0, 1, 2, 3, 6, 10]) {
+      check(answer, drawOptions(answer, { min: answer, max: answer }, Math.random, { floor: 0, ceiling: 10 }), 0, 10);
+    }
+  }
+  // Where a room is open on both sides, the answer is as likely to be any of the four.
+  const ranks = [0, 0, 0, 0];
+  for (let i = 0; i < 20000; i++) {
+    const options = drawOptions(50, { min: 50, max: 50 }, Math.random, { floor: 0, ceiling: 100 });
+    ranks[options.filter((o) => o < 50).length]++;
+  }
+  for (const count of ranks) assert.ok(Math.abs(count - 5000) < 400, `ranks ${ranks}`);
+
+  // And through the API, where the floor is negatives=false and the ceiling max.
+  for (const [query, floor, ceiling] of [
+    ['answerMin=0&answerMax=0&negatives=false', 0, 10000],
+    ['answerMin=1&answerMax=2&negatives=false', 0, 10000],
+    ['answerMin=10&answerMax=10&max=10', -10, 10],
+    ['answerMin=9&answerMax=10&max=10&negatives=false', 0, 10],
+    ['answerMin=10000&answerMax=10000', -10000, 10000],
+  ]) {
+    for (const { answer, quizOptions } of await quiz(query)) check(answer, quizOptions, floor, ceiling);
+  }
+});
+
 test('the same seed is the same quiz in a range, and the range is part of what a seed names', async () => {
   const one = await (await fetch(`${base}/gen?seed=8&count=10&answerMin=50&answerMax=100`)).text();
   assert.equal(await (await fetch(`${base}/gen?seed=8&count=10&answerMin=50&answerMax=100`)).text(), one);
