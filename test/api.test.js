@@ -84,6 +84,35 @@ test('a generator that throws is a 500 in the format asked for, not a stack trac
   }
 });
 
+test('options the generator refuses are a 400 with its message, never a 500', async (t) => {
+  const logged = t.mock.method(console, 'error', () => {});
+  const refusals = [
+    [() => { throw new TypeError('unknown option "negative", did you mean negatives?'); }, 'unknown option "negative", did you mean negatives?'],
+    [() => { throw new RangeError('no task of 3 terms evaluating to 0 can be built from * /'); }, 'no task of 3 terms evaluating to 0 can be built from * /'],
+  ];
+  for (const [generate, message] of refusals) {
+    const app = await listen(createApp(readConfig({}), generate));
+    try {
+      for (const query of ['', '?seed=3', '?count=4']) {
+        const res = await fetch(`${app.base}/gen${query}`);
+        assert.equal(res.status, 400, `${message} ${query}`);
+        assert.match(res.headers.get('content-type'), /^application\/json/);
+        assert.deepEqual(await res.json(), { error: message });
+      }
+      const cli = await fetch(`${app.base}/gen?c=true&count=4`);
+      assert.equal(cli.status, 400);
+      assert.match(cli.headers.get('content-type'), /^text\/plain/);
+      assert.equal(await cli.text(), message);
+      assert.equal((await fetch(`${app.base}/gen?seed=3`)).headers.get('etag'), null, 'a refusal is not kept');
+    } finally {
+      app.server.close();
+    }
+  }
+  // Only the TypeError says the server itself asked wrongly: it is logged on
+  // each of the five requests it answered, the RangeError on none.
+  assert.equal(logged.mock.callCount(), 5);
+});
+
 test('every task served works out to its answer', () => {
   // samathgen 0.1.3 got about 3% of these wrong on its own, and wrote
   // another few percent as "3*-1*3+20"; 1.0 gets none of them wrong.
