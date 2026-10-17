@@ -100,6 +100,8 @@ test('a seed asked for again is not drawn again, and says the same', async () =>
     assert.equal(app.state.calls, 18, 'another brackets is another answer');
     await fetch(`${app.base}/gen?seed=1&count=3&brackets=never`);
     assert.equal(app.state.calls, 21, 'never is not the same answer as false');
+    await fetch(`${app.base}/gen?seed=1&count=3&max=50`);
+    assert.equal(app.state.calls, 24, 'another max is another answer');
   } finally {
     app.server.close();
   }

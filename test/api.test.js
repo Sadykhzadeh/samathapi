@@ -1,7 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mathGen } from 'samathgen';
-import { COUNT_MAX, SEED_MAX, createApp, drawOptions, drawSound, readConfig } from '../app.js';
+import { COUNT_MAX, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, drawOptions, drawSound, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", which SaMathCLI splits on
@@ -305,6 +305,77 @@ test('brackets=never leaves out every group, and false does not', async () => {
   // one, which is why 'never' is a value of its own.
   const tasks = await (await fetch(`${base}/gen?brackets=false&length=4&count=${COUNT_MAX}`)).json();
   assert.ok(tasks.filter(({ task }) => hasGroup(task)).length > 20);
+});
+
+test('max reaches the generator as a number, and without it nothing is said', async () => {
+  const seen = [];
+  const app = await listen(createApp(readConfig({}), (length, options) => {
+    seen.push(options);
+    return { task: [seen.length, '+', 1], answer: seen.length + 1, quizOptions: [] };
+  }));
+  try {
+    await (await fetch(`${app.base}/gen?max=50`)).text();
+    await (await fetch(`${app.base}/gen`)).text();
+  } finally {
+    app.server.close();
+  }
+  assert.equal(seen[0].max, 50);
+  assert.ok(!('max' in seen[1]), 'max is not sent when the request has none');
+});
+
+test('max keeps every number, the answer and every option within it', async () => {
+  for (const max of [MAX_LEAST, 15, 20, 100]) {
+    for (const query of ['length=2', 'length=4', 'length=8&brackets=true', 'length=6&negatives=false', 'length=5&brackets=never']) {
+      const res = await fetch(`${base}/gen?max=${max}&count=${COUNT_MAX}&${query}`);
+      assert.equal(res.status, 200, `max=${max} ${query}`);
+      for (const { task, answer, quizOptions } of await res.json()) {
+        const text = task.join('');
+        assert.equal(evaluate(text, { negatives: !query.includes('negatives=false') }), answer, text);
+        assert.ok(task.every((piece) => typeof piece !== 'number' || Math.abs(piece) <= max), `${text} past ${max}`);
+        assert.ok([answer, ...quizOptions].every((n) => Math.abs(n) <= max), `${quizOptions} for ${answer} past ${max}`);
+      }
+    }
+  }
+});
+
+test('under a max below 20 the answers are from half of it up to it, and so are the options', async () => {
+  for (const [max, low, high] of [[10, 5, 10], [11, 6, 11], [15, 8, 15], [19, 10, 19], [20, 10, 20], [500, 10, 20]]) {
+    const seen = new Set();
+    for (let i = 0; i < 5; i++) {
+      for (const { answer, quizOptions } of await (await fetch(`${base}/gen?max=${max}&count=${COUNT_MAX}&length=3`)).json()) {
+        seen.add(answer);
+        assert.ok(answer >= low && answer <= high, `${answer} with max=${max}`);
+        assert.equal(new Set(quizOptions).size, 4, `${quizOptions}`);
+        assert.ok(quizOptions.every((o) => o >= low && o <= high), `${quizOptions} for ${answer} with max=${max}`);
+      }
+    }
+    assert.equal(seen.size, high - low + 1, `every answer from ${low} to ${high} turns up with max=${max}`);
+  }
+});
+
+test('a max it cannot honour is a 400 that says why', async () => {
+  const app = await spyApp();
+  try {
+    const rule = `max must be a whole number from ${MAX_LEAST} to ${MAX_MOST}, not`;
+    for (const [query, error] of [
+      [`max=${MAX_LEAST - 1}`, `${rule} "${MAX_LEAST - 1}"`],
+      [`max=${MAX_MOST + 1}`, `${rule} "${MAX_MOST + 1}"`],
+      ['max=1.5e1', `${rule} "1.5e1"`],
+      ['max=-20', `${rule} "-20"`],
+      ['max=lots', `${rule} "lots"`],
+      ['max=', `${rule} ""`],
+      ['max=20&max=30', 'max was sent 2 times, send it once'],
+      ['answerMin=5&answerMax=60&max=50', 'answerMax must not be more than max, 60 is more than 50'],
+    ]) {
+      assert.equal(await badRequest(app, query), error, query);
+    }
+    assert.equal(app.asked.length, 0, 'the generator was called for a bad request');
+    for (const query of [`max=${MAX_LEAST}`, `max=${MAX_MOST}`, 'answerMin=5&answerMax=50&max=50']) {
+      assert.equal((await fetch(`${app.base}/gen?${query}`)).status, 200, query);
+    }
+  } finally {
+    app.server.close();
+  }
 });
 
 test('brackets in the request overrides the config both ways', async () => {
@@ -695,7 +766,7 @@ test('a parameter that is a typo of a known one is a 400 that suggests the right
     for (const [name, suggestion] of [
       ['lenght', 'length'], ['lengh', 'length'], ['bracket', 'brackets'], ['Brackets', 'brackets'],
       ['negative', 'negatives'], ['negatvies', 'negatives'], ['counts', 'count'], ['cuont', 'count'],
-      ['sed', 'seed'], ['seeds', 'seed'],
+      ['sed', 'seed'], ['seeds', 'seed'], ['maxx', 'max'], ['mac', 'max'],
     ]) {
       assert.equal(await badRequest(app, `${name}=3`), `unknown parameter "${name}", did you mean ${suggestion}?`, name);
     }

@@ -97,6 +97,7 @@ in `(-96)/((52-28)/(-3))`.
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
 | `brackets` | `true`, `false` or `never` | the `brackets` setting, `true` or `false` |
 | `negatives` | `true` or `false` | the `negatives` setting |
+| `max` | how far from zero any number may be, a whole number from `10` to `10000` | `10000` |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
 | `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `1` to `500` with at most `100` between them; both or neither | `10` and `20` |
@@ -140,6 +141,28 @@ curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=false&length=4&
 curl -H 'Accept: text/plain' 'http://localhost:3000/gen?brackets=never&length=4&seed=4'
 # 30/5+19-7 18,19,20,15 18
 ```
+
+### Numbers that stay small
+
+A class that counts within 20 does not want `175*2/7`. `max` is the furthest
+from zero any number may be, and it holds for every number in the task, for
+every step of working it out from left to right and for the answer and the
+options. Left alone, samathgen lets numbers run well past the answer: past 100
+in 17 tasks in 100 of three numbers, and past 20 in 58 in 100 of those without
+negatives or brackets. With `max=20` none of them does.
+
+```sh
+curl 'http://localhost:3000/gen?c=true&count=4&length=3&max=20&negatives=false&brackets=never&seed=1'
+# 19-3*3 10,11,13,12 10
+# 20/10*5 10,12,14,11 10
+# 2+4*4 17,18,13,15 18
+# 9-8+17 18,19,20,15 18
+```
+
+The answers still come from 10 to 20, unless `max` is below 20, when they come
+from half of it up to it, `5` to `10` for `max=10`, and so do the options. A
+range of your own with `answerMin` and `answerMax` may not go past `max`.
+`max` is part of what a seed names.
 
 ### Answers in a range of your own
 

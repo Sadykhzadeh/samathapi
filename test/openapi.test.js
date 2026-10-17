@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, SEED_MAX, createApp, readConfig } from '../app.js';
+import { ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, readConfig } from '../app.js';
 
 let server;
 let base;
@@ -37,12 +37,13 @@ test('every path it lists is served, and every path served is listed', async () 
 
 test('the limits it states are the limits the server enforces', async () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
-  assert.deepEqual(Object.keys(parameters).sort(), ['answerMax', 'answerMin', 'brackets', 'c', 'count', 'length', 'negatives', 'seed']);
+  assert.deepEqual(Object.keys(parameters).sort(), ['answerMax', 'answerMin', 'brackets', 'c', 'count', 'length', 'max', 'negatives', 'seed']);
 
   const status = async (query) => (await fetch(`${base}/gen?${query}`)).status;
   const limits = {
     length: [LENGTH_MIN, LENGTH_MAX],
     count: [1, COUNT_MAX],
+    max: [MAX_LEAST, MAX_MOST],
     seed: [0, SEED_MAX],
   };
   for (const [name, [min, max]] of Object.entries(limits)) {
