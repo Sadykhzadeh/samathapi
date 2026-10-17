@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { mathGen } from 'samathgen';
+import { createCache } from './cache.js';
 import { evaluate } from './evaluate.js';
 
 // Env values are strings and every non-empty string is truthy, so only the
@@ -342,15 +344,36 @@ const send = (res, status, type, body, headers) => {
 
 const ALLOWED = 'GET, HEAD, OPTIONS';
 
+// What a server keeps of the seeded answers it has given. A seed names the
+// same tasks for as long as the server and the generator stay as they are, so
+// asking again needs no drawing, no checking and no rendering. The bytes are
+// those of the bodies, which are at most about 13 000 each.
+export const CACHE_BYTES = 4 * 2 ** 20;
+
+// How long a client or a cache in between may reuse a seeded answer without
+// asking. Upgrading samathgen can change what a seed names, so not for ever.
+const SEEDED_CACHE_CONTROL = 'public, max-age=3600';
+
+const etagOf = (body) => `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`;
+
+// Whether an If-None-Match header names this tag, weak or not, or anything.
+const matches = (header, etag) => header !== undefined
+  && header.split(',').some((tag) => {
+    const named = tag.trim().replace(/^W\//, '');
+    return named === '*' || named === etag;
+  });
+
 // `generate` is mathGen unless a test hands in something else. What comes
 // back is a plain http.Server, not yet listening.
 export const createApp = (config, generate = mathGen) => {
+  const cache = createCache(CACHE_BYTES);
+
   const gen = (req, res, query) => {
     const asText = wantsText(query, req.headers.accept);
     const type = asText ? TEXT_TYPE : JSON_TYPE;
     // The format depends on the Accept header unless `c` is given, which a
     // cache between here and the client has to know.
-    const answer = (status, body) => send(res, status, type, body, { Vary: 'Accept' });
+    const answer = (status, body, headers) => send(res, status, type, body, { Vary: 'Accept', ...headers });
     // An error comes in the format the request asked for, as the bare
     // message for c=true and as {"error": "..."} otherwise.
     const fail = (status, message) => answer(status, asText ? message : JSON.stringify({ error: message }));
@@ -359,25 +382,42 @@ export const createApp = (config, generate = mathGen) => {
       fail(400, request.error);
       return;
     }
-    let tasks;
-    try {
-      tasks = drawTasks(generate, request, config);
-    } catch (error) {
-      // keep the stack trace out of the reply
-      console.error('mathGen failed:', error);
-      fail(500, 'could not generate a task');
-      return;
+
+    const render = (tasks) => {
+      if (request.count === undefined) return asText ? cliLine(tasks[0]) : JSON.stringify(tasks[0]);
+      return asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(tasks);
+    };
+    const key = request.seed === undefined ? undefined : [
+      asText, request.length, request.brackets, request.negatives, request.count, request.seed,
+    ].join();
+    let entry = key === undefined ? undefined : cache.get(key);
+    if (entry === undefined) {
+      try {
+        const body = render(drawTasks(generate, request, config));
+        entry = { body, etag: key === undefined ? undefined : etagOf(body) };
+      } catch (error) {
+        // keep the stack trace out of the reply
+        console.error('mathGen failed:', error);
+        fail(500, 'could not generate a task');
+        return;
+      }
+      if (key !== undefined) cache.set(key, entry);
     }
-    if (request.count === undefined) {
-      answer(200, asText ? cliLine(tasks[0]) : JSON.stringify(tasks[0]));
+
+    if (key === undefined) {
+      // Every unseeded answer is new; nothing may hold on to it.
+      answer(200, entry.body, { 'Cache-Control': 'no-store' });
+    } else if (matches(req.headers['if-none-match'], entry.etag)) {
+      res.writeHead(304, { ETag: entry.etag, 'Cache-Control': SEEDED_CACHE_CONTROL, Vary: 'Accept', ...EVERY_ANSWER });
+      res.end();
     } else {
-      answer(200, asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(tasks));
+      answer(200, entry.body, { ETag: entry.etag, 'Cache-Control': SEEDED_CACHE_CONTROL });
     }
   };
 
   const routes = new Map(Object.entries({
     '/': (req, res) => send(res, 200, TEXT_TYPE, 'Hello World'),
-    '/healthz': (req, res) => send(res, 200, JSON_TYPE, '{"ok":true}'),
+    '/healthz': (req, res) => send(res, 200, JSON_TYPE, '{"ok":true}', { 'Cache-Control': 'no-store' }),
     '/gen': (req, res) => gen(req, res, readQuery(req.url)),
   }));
 
