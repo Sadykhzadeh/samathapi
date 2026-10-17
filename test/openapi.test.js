@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNT_MAX, LENGTH_MAX, LENGTH_MIN, SEED_MAX, createApp, readConfig } from '../app.js';
+import { ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, SEED_MAX, createApp, readConfig } from '../app.js';
 
 let server;
 let base;
@@ -37,7 +37,7 @@ test('every path it lists is served, and every path served is listed', async () 
 
 test('the limits it states are the limits the server enforces', async () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
-  assert.deepEqual(Object.keys(parameters).sort(), ['brackets', 'c', 'count', 'length', 'negatives', 'seed']);
+  assert.deepEqual(Object.keys(parameters).sort(), ['answerMax', 'answerMin', 'brackets', 'c', 'count', 'length', 'negatives', 'seed']);
 
   const status = async (query) => (await fetch(`${base}/gen?${query}`)).status;
   const limits = {
@@ -55,6 +55,21 @@ test('the limits it states are the limits the server enforces', async () => {
     assert.equal(await status(`${name}=${min - 1}`), 400, `${name}=${min - 1}`);
     assert.equal(await status(`${name}=${max + 1}`), 400, `${name}=${max + 1}`);
   }
+  for (const name of ['answerMin', 'answerMax']) {
+    const { schema } = parameters[name];
+    assert.equal(schema.type, 'integer');
+    assert.equal(schema.minimum, 1, name);
+    assert.equal(schema.maximum, ANSWER_LIMIT, name);
+  }
+  assert.match(parameters.answerMin.description, new RegExp(`at most ${ANSWER_SPAN} more`));
+  const other = { answerMin: 'answerMax', answerMax: 'answerMin' };
+  for (const name of Object.keys(other)) {
+    assert.equal(await status(`${name}=1&${other[name]}=1`), 200, name);
+    assert.equal(await status(`${name}=0&${other[name]}=1`), 400, name);
+    assert.equal(await status(`${name}=${ANSWER_LIMIT + 1}&${other[name]}=1`), 400, name);
+  }
+  assert.equal(await status(`answerMin=${ANSWER_LIMIT - ANSWER_SPAN}&answerMax=${ANSWER_LIMIT}`), 200);
+  assert.equal(await status(`answerMin=${ANSWER_LIMIT - ANSWER_SPAN - 1}&answerMax=${ANSWER_LIMIT}`), 400);
   for (const name of ['brackets', 'negatives']) {
     assert.equal(parameters[name].schema.type, 'boolean');
     assert.equal(await status(`${name}=true`), 200);
