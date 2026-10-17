@@ -1,7 +1,7 @@
 // The OpenAPI description of the server, built from the limits and settings
 // the server itself runs on, so it cannot say 2 to 12 where the code says
 // something else.
-export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, config }) => {
+export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, answerLimit, answerSpan, config }) => {
   const error = (description) => ({
     description,
     content: {
@@ -87,6 +87,18 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, co
               in: 'query',
               description: 'How many tasks. The answer is then a list, also for 1; without it the answer is one task. No task comes twice in a list unless a seed is given.',
               schema: { type: 'integer', minimum: 1, maximum: countMax },
+            },
+            {
+              name: 'answerMin',
+              in: 'query',
+              description: `The least answer a task may have, with answerMax, which has to come with it, at most ${answerSpan} more. Without them every answer is from 10 to 20. The four options stay inside the range.`,
+              schema: { type: 'integer', minimum: 1, maximum: answerLimit },
+            },
+            {
+              name: 'answerMax',
+              in: 'query',
+              description: 'The greatest answer a task may have. Every task draws its own answer from answerMin to answerMax, the ends included.',
+              schema: { type: 'integer', minimum: 1, maximum: answerLimit },
             },
             {
               name: 'seed',

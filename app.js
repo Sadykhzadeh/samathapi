@@ -57,13 +57,13 @@ const genNumber = (first, second) => {
 // of a 500.
 const ATTEMPTS = 500;
 
-const isSound = ({ task, answer }, negatives) =>
-  evaluate(task.join(''), { negatives }) === answer;
+const isSound = ({ task, answer }, { negatives, answer: asked }) =>
+  evaluate(task.join(''), { negatives }) === answer && (asked === undefined || answer === asked);
 
 export const drawSound = (generate, length, options) => {
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     const result = generate(length, options);
-    if (isSound(result, options.negatives)) return result;
+    if (isSound(result, options)) return result;
   }
   return null;
 };
@@ -84,33 +84,35 @@ const shuffle = (items) => {
 // first, so it is as likely to be the smallest as the largest or either
 // between, whatever the four look like.
 //
-// That alone still lets a pupil rule options out by size, because samathgen
-// gives every task an answer from 10 to 20 and a pupil who has done a few
-// quizzes knows it: of 6, 7, 8 and 10 only 10 can be right. So an answer in
-// that range draws its four from sets that stay inside it, each four numbers
-// that fit in six in a row, weighted so that the sets holding any one number
-// weigh 1 in all. A set then comes up as often for each of its four numbers,
-// and seeing it says nothing about which one is the answer. The weights
-// start as the number of places a set's shape fits in six in a row, which is
-// how often the window above gives it, and are scaled number by number until
-// every sum is 1; 200 rounds get there to the last bit.
-const ANSWER_MIN = 10;
-const ANSWER_MAX = 20;
+// That alone still lets a pupil rule options out by size, because every
+// answer comes from one range, 10 to 20 unless the request names its own, and
+// a pupil who has done a few quizzes knows it: of 6, 7, 8 and 10 only 10 can
+// be right. So an answer in the range draws its four from sets that stay
+// inside it, each four numbers that fit in six in a row, weighted so that the
+// sets holding any one number weigh 1 in all. A set then comes up as often
+// for each of its four numbers, and seeing it says nothing about which one is
+// the answer. The weights start as the number of places a set's shape fits in
+// six in a row, which is how often the window above gives it, and are scaled
+// number by number until every sum is 1; 200 rounds get there to the last
+// bit. A range of fewer than four numbers has no such set and falls back on
+// the window alone.
+export const DEFAULT_RANGE = { min: 10, max: 20 };
 
-const optionSets = (() => {
+const buildOptionSets = ({ min, max }) => {
+  if (max - min + 1 < 4) return new Map();
   const sets = [];
-  for (let low = ANSWER_MIN; low + 3 <= ANSWER_MAX; low++) {
+  for (let low = min; low + 3 <= max; low++) {
     for (let places = 1; places < 64; places += 2) {
       const numbers = [0, 1, 2, 3, 4, 5]
         .filter((place) => (places >> place) & 1)
         .map((place) => low + place);
-      if (numbers.length === 4 && numbers[3] <= ANSWER_MAX) {
+      if (numbers.length === 4 && numbers[3] <= max) {
         sets.push({ numbers, weight: 6 - (numbers[3] - low) });
       }
     }
   }
   const holding = new Map();
-  for (let n = ANSWER_MIN; n <= ANSWER_MAX; n++) {
+  for (let n = min; n <= max; n++) {
     holding.set(n, sets.filter((set) => set.numbers.includes(n)));
   }
   for (let round = 0; round < 200; round++) {
@@ -120,10 +122,24 @@ const optionSets = (() => {
     }
   }
   return holding;
-})();
+};
 
-export const drawOptions = (answer) => {
-  const sets = optionSets.get(answer);
+// Building a range's sets takes a few milliseconds for the widest, so they
+// are kept for the ranges asked for lately.
+const optionSetsByRange = new Map();
+const optionSetsFor = (range) => {
+  const key = range.min * 2048 + range.max;
+  let sets = optionSetsByRange.get(key);
+  if (sets === undefined) {
+    if (optionSetsByRange.size >= 64) optionSetsByRange.delete(optionSetsByRange.keys().next().value);
+    sets = buildOptionSets(range);
+    optionSetsByRange.set(key, sets);
+  }
+  return sets;
+};
+
+export const drawOptions = (answer, range = DEFAULT_RANGE) => {
+  const sets = optionSetsFor(range).get(answer);
   if (sets) {
     let left = Math.random();
     const set = sets.find(({ weight }) => (left -= weight) < 0) ?? sets.at(-1);
@@ -137,6 +153,13 @@ export const drawOptions = (answer) => {
 // How many tasks one request may ask for. A quiz is a few dozen questions at
 // most; past this a count from a query string stops being a quiz.
 export const COUNT_MAX = 100;
+
+// The answers a request may ask for: whole numbers from 1 to ANSWER_LIMIT,
+// with at most ANSWER_SPAN between the least and the most. Zero is left out
+// because samathgen 0.1.3 reads an answer of 0 as none, and the span keeps the
+// work of making the options give nothing away within a few milliseconds.
+export const ANSWER_LIMIT = 500;
+export const ANSWER_SPAN = 100;
 
 // A seed is 32 bits wide, which is all the generator below can use.
 export const SEED_MAX = 2 ** 32 - 1;
@@ -186,7 +209,7 @@ const complaint = (name, rule, value) => (Array.isArray(value)
 // more than an older server takes, unless it is a typo of one it does: a
 // teacher who sends bracket=true should hear that it did nothing, not get a
 // worksheet without brackets.
-const PARAMETERS = ['length', 'brackets', 'negatives', 'count', 'seed'];
+const PARAMETERS = ['length', 'brackets', 'negatives', 'count', 'seed', 'answerMin', 'answerMax'];
 
 const distance = (a, b) => {
   let row = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -202,7 +225,16 @@ const distance = (a, b) => {
 
 const misspelt = (name) => {
   if (name.length < 3 || PARAMETERS.includes(name)) return undefined;
-  const near = PARAMETERS.find((known) => distance(name.toLowerCase(), known) <= (name.length < 5 ? 1 : 2));
+  const limit = name.length < 5 ? 1 : 2;
+  let near;
+  let nearest = Infinity;
+  for (const known of PARAMETERS) {
+    const apart = distance(name.toLowerCase(), known.toLowerCase());
+    if (apart <= limit && apart < nearest) {
+      near = known;
+      nearest = apart;
+    }
+  }
   return near && `unknown parameter ${sent(name)}, did you mean ${near}?`;
 };
 
@@ -214,6 +246,7 @@ const readRequest = (query, config) => {
     negatives: config.negatives,
     count: undefined,
     seed: undefined,
+    answers: undefined,
   };
   const errors = Object.keys(query).map(misspelt).filter(Boolean);
   if (length !== undefined) {
@@ -238,6 +271,23 @@ const readRequest = (query, config) => {
     const parsed = wholeNumber(seed);
     if (parsed <= SEED_MAX) request.seed = parsed;
     else errors.push(complaint('seed', `a whole number from 0 to ${SEED_MAX}`, seed));
+  }
+  const { answerMin, answerMax } = query;
+  if (answerMin !== undefined || answerMax !== undefined) {
+    const rule = `a whole number from 1 to ${ANSWER_LIMIT}`;
+    const min = answerMin === undefined ? undefined : wholeNumber(answerMin);
+    const max = answerMax === undefined ? undefined : wholeNumber(answerMax);
+    const minOk = min >= 1 && min <= ANSWER_LIMIT;
+    const maxOk = max >= 1 && max <= ANSWER_LIMIT;
+    if (answerMin !== undefined && !minOk) errors.push(complaint('answerMin', rule, answerMin));
+    if (answerMax !== undefined && !maxOk) errors.push(complaint('answerMax', rule, answerMax));
+    if (answerMin === undefined) errors.push('answerMax needs answerMin as well');
+    else if (answerMax === undefined) errors.push('answerMin needs answerMax as well');
+    else if (minOk && maxOk && min > max) errors.push(`answerMin must not be more than answerMax, ${min} is more than ${max}`);
+    else if (minOk && maxOk && max - min > ANSWER_SPAN) {
+      errors.push(`answerMax must be at most ${ANSWER_SPAN} more than answerMin, ${max} is ${max - min} more than ${min}`);
+    }
+    if (errors.length === 0) request.answers = { min, max };
   }
   return errors.length > 0 ? { error: errors.join('; ') } : request;
 };
@@ -287,22 +337,30 @@ const cliLine = ({ task, answer, quizOptions }) =>
 
 // The generator is still asked for options of its own, which are replaced:
 // the tasks a seed gives depend on every number it draws.
+// With an answer range each task is asked for an answer drawn from it, and
+// one that comes back with another is drawn again.
 const drawTask = (generate, request, config) => {
-  const result = drawSound(
-    generate,
-    request.length ?? genNumber(config.lengthFrom, config.lengthTo),
-    { brackets: request.brackets, negatives: request.negatives, quizMode: true },
-  );
-  return result && { ...result, quizOptions: drawOptions(result.answer) };
+  const { answers } = request;
+  const length = request.length ?? genNumber(config.lengthFrom, config.lengthTo);
+  const options = { brackets: request.brackets, negatives: request.negatives, quizMode: true };
+  if (answers) options.answer = genNumber(answers.min, answers.max);
+  const result = drawSound(generate, length, options);
+  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? DEFAULT_RANGE) };
 };
 
 // A quiz asks each question once, so a task it already holds is drawn again,
-// up to ATTEMPTS times before the repeat is served.
-const drawFresh = (generate, request, config, asked) => {
+// up to ATTEMPTS times before the repeat is served. A narrow request has few
+// tasks to give, as an answer of exactly 1 within two numbers has, and 100 of
+// them would draw again and again, so the redraws of a whole request are
+// limited too: past REDRAWS the rest may repeat.
+const REDRAWS = 500;
+
+const drawFresh = (generate, request, config, asked, budget) => {
   let result;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     result = drawTask(generate, request, config);
     if (!result || !asked.has(result.task.join(''))) break;
+    if (--budget.redraws < 0) break;
   }
   return result;
 };
@@ -313,9 +371,10 @@ const drawFresh = (generate, request, config, asked) => {
 const drawTasks = (generate, request, config) => {
   const tasks = [];
   const asked = new Set();
+  const budget = { redraws: REDRAWS };
   for (let i = 0; i < (request.count ?? 1); i++) {
     const result = request.seed === undefined
-      ? drawFresh(generate, request, config, asked)
+      ? drawFresh(generate, request, config, asked, budget)
       : seeded((request.seed + i) % (SEED_MAX + 1), () => drawTask(generate, request, config));
     if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
     asked.add(result.task.join(''));
@@ -391,6 +450,8 @@ export const createApp = (config, generate = mathGen) => {
     lengthMax: LENGTH_MAX,
     countMax: COUNT_MAX,
     seedMax: SEED_MAX,
+    answerLimit: ANSWER_LIMIT,
+    answerSpan: ANSWER_SPAN,
     config,
   }));
 
@@ -416,6 +477,7 @@ export const createApp = (config, generate = mathGen) => {
     };
     const key = request.seed === undefined ? undefined : [
       asText, request.length, request.brackets, request.negatives, request.count, request.seed,
+      request.answers?.min, request.answers?.max,
     ].join();
     let entry = key === undefined ? undefined : cache.get(key);
     if (entry === undefined) {

@@ -77,7 +77,7 @@ curl 'http://localhost:3000/gen?brackets=true&seed=5'
 | --- | --- |
 | `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `3*9*2/(4-1)`. |
 | `answer` | What the task works out to, a whole number. |
-| `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. They are four of six numbers in a row, and `answer` is as likely to be the smallest of them as the largest or either between, so a pupil cannot pick it by its size. samathgen gives every task an answer from 10 to 20, so the options stay within 10 to 20 as well, drawn so that whichever four a pupil sees, each is as likely to be the answer as the others: a pupil who knows the range cannot rule any of them out. |
+| `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. They are four of six numbers in a row, and `answer` is as likely to be the smallest of them as the largest or either between, so a pupil cannot pick it by its size. samathgen gives every task an answer from 10 to 20, or from the range a request asks for with `answerMin` and `answerMax`, so the options stay within that range as well, drawn so that whichever four a pupil sees, each is as likely to be the answer as the others: a pupil who knows the range cannot rule any of them out. |
 
 Read the task by joining it rather than piece by piece: samathgen 0.1.3, which
 is what npm serves, sends a bracketed group as a single string such as
@@ -93,6 +93,7 @@ can be negative, as `-10` in `-10+1*5*4`.
 | `negatives` | `true` or `false` | the `negatives` setting |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
+| `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `1` to `500` with at most `100` between them; both or neither | `10` and `20` |
 
 ```sh
 curl 'http://localhost:3000/gen?length=6&brackets=true'
@@ -118,6 +119,29 @@ met negative numbers, since samathgen 0.1.3 puts one in about a quarter of its
 tasks and two in five with brackets. Setting `negatives=false` in the
 environment does the same for every request that does not ask otherwise, so
 a client that never sends it, such as SaMathCLI, gets it too.
+
+### Answers in a range of your own
+
+samathgen draws every answer from 10 to 20. A class that is further on asks
+for its own range, and every task draws an answer from it, the ends included:
+
+```sh
+curl 'http://localhost:3000/gen?answerMin=50&answerMax=100&length=3&seed=7'
+# {"task":[175,"*",2,"/",7],"answer":50,"quizOptions":[51,52,50,53]}
+```
+
+The four options stay inside the range, so a pupil who knows it can rule none
+of them out, and each is as likely to be the answer as the others. The range
+may not be wider than 100 numbers, which keeps the work of building those
+options small. It starts at 1 because samathgen 0.1.3 takes an answer of 0 to
+mean none, and ends at 500 because with `brackets=true` and two numbers the
+same version takes up to a quarter of a millisecond to find a task for an
+answer near 1000. It goes with `length`, `brackets`, `negatives`, `count` and
+`seed`; the range is part of what a seed names.
+
+A range of a few numbers has few tasks to give, so a `count` of 100 with
+`answerMin=1&answerMax=1` repeats: the server draws again for a repeat at most
+500 times in all and then serves it.
 
 ### Many tasks in one request
 
