@@ -43,6 +43,10 @@ one machine rather than numbers between machines.
 Only the exact string `true` turns `c` on; anything else, `false` included,
 returns JSON.
 
+Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
+`405` with an `Allow` header, both as `{"error":"..."}`. The server is plain
+`node:http`, with no framework between it and the generator.
+
 ### The task as JSON
 
 ```sh
