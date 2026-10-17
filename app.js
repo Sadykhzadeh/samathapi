@@ -249,6 +249,33 @@ const readQuery = (url) => {
   return query;
 };
 
+// How much an Accept header wants `type`: the q of the most specific range
+// that covers it, or 0 when none does.
+const wanted = (accept, type) => {
+  let best = 0;
+  let bestSpecificity = 0;
+  for (const part of accept.split(',')) {
+    const [range, ...params] = part.split(';');
+    const name = range.trim().toLowerCase();
+    const specificity = name === type ? 3 : name === `${type.split('/')[0]}/*` ? 2 : name === '*/*' ? 1 : 0;
+    if (specificity <= bestSpecificity) continue;
+    const q = params.map((param) => param.trim().toLowerCase()).find((param) => param.startsWith('q='));
+    const value = q === undefined ? 1 : Number(q.slice(2));
+    best = Number.isFinite(value) ? value : 0;
+    bestSpecificity = specificity;
+  }
+  return best;
+};
+
+// The answer is the plain line for SaMathCLI when `c` says so, and JSON when
+// it says anything else. Without a `c` the Accept header decides: plain text
+// only when the client asks for it ahead of JSON, so a browser or curl, which
+// accept anything, get JSON.
+const wantsText = (query, accept) => {
+  if (query.c !== undefined) return flag(query.c);
+  return accept !== undefined && wanted(accept, 'text/plain') > wanted(accept, 'application/json');
+};
+
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", the line SaMathCLI parses.
 const cliLine = ({ task, answer, quizOptions }) =>
   `${task.join('')} ${quizOptions.join(',')} ${answer}`;
@@ -319,13 +346,14 @@ const ALLOWED = 'GET, HEAD, OPTIONS';
 // back is a plain http.Server, not yet listening.
 export const createApp = (config, generate = mathGen) => {
   const gen = (req, res, query) => {
-    const isCLI = flag(query.c);
+    const asText = wantsText(query, req.headers.accept);
+    const type = asText ? TEXT_TYPE : JSON_TYPE;
+    // The format depends on the Accept header unless `c` is given, which a
+    // cache between here and the client has to know.
+    const answer = (status, body) => send(res, status, type, body, { Vary: 'Accept' });
     // An error comes in the format the request asked for, as the bare
     // message for c=true and as {"error": "..."} otherwise.
-    const fail = (status, message) => {
-      if (isCLI) send(res, status, TEXT_TYPE, message);
-      else send(res, status, JSON_TYPE, JSON.stringify({ error: message }));
-    };
+    const fail = (status, message) => answer(status, asText ? message : JSON.stringify({ error: message }));
     const request = readRequest(query, config);
     if (request.error) {
       fail(400, request.error);
@@ -341,12 +369,9 @@ export const createApp = (config, generate = mathGen) => {
       return;
     }
     if (request.count === undefined) {
-      if (isCLI) send(res, 200, TEXT_TYPE, cliLine(tasks[0]));
-      else send(res, 200, JSON_TYPE, JSON.stringify(tasks[0]));
-    } else if (isCLI) {
-      send(res, 200, TEXT_TYPE, `${tasks.map(cliLine).join('\n')}\n`);
+      answer(200, asText ? cliLine(tasks[0]) : JSON.stringify(tasks[0]));
     } else {
-      send(res, 200, JSON_TYPE, JSON.stringify(tasks));
+      answer(200, asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(tasks));
     }
   };
 

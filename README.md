@@ -46,7 +46,11 @@ one machine rather than numbers between machines.
 | `GET /gen?c=true` | plain text `<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>`, the shape [SaMathCLI](https://got.az/azer/samathcli) parses |
 
 Only the exact string `true` turns `c` on; anything else, `false` included,
-returns JSON.
+returns JSON. Without a `c`, the `Accept` header decides: a client that asks
+for `text/plain` ahead of JSON gets the plain line, so
+`curl -H 'Accept: text/plain' localhost:3000/gen` and `/gen?c=true` are the same
+answer. A browser or `curl` with no header, which accept anything, get JSON.
+Errors follow the same choice, and the answer carries `Vary: Accept`.
 
 Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
 `405` with an `Allow` header, both as `{"error":"..."}`. The server is plain
