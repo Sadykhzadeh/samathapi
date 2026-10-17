@@ -32,9 +32,15 @@ nothing extra to install.
 `npm run bench` starts the server and prints how long it took to answer its
 first request, how much memory it holds, and the requests per second and
 latency of each path on keep-alive connections. `node bench/bench.js --seconds 10`
-runs longer, `--connections 64` sends more at once, and `node bench/bench.js '/gen?count=50'`
+runs longer, `--connections 64` sends more at once, `--gzip` asks for compressed answers as a
+browser does, and `node bench/bench.js '/gen?count=50'`
 measures a path of your own. The client is Node as well, so compare runs on
 one machine rather than numbers between machines.
+
+The server holds about 58 MB at idle. Under load its resident size grows to 130
+MB or more, because V8 enlarges its young generation, not because anything
+piles up: the live heap is 9 MB after a collection. `node --max-semi-space-size=4 .`
+keeps it near 85 MB at the same throughput, for a host with little memory.
 
 ## Endpoints
 

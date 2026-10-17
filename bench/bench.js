@@ -6,6 +6,7 @@
 //   node bench/bench.js                    every scenario, 3 s each
 //   node bench/bench.js --seconds 10       longer runs
 //   node bench/bench.js --connections 64   more clients at once
+//   node bench/bench.js --gzip             ask for gzip, as a browser does
 //   node bench/bench.js '/gen?count=100'   one path of your own
 //
 // The client is Node too, so on a fast machine it runs out of breath before
@@ -26,6 +27,8 @@ const option = (name, fallback) => {
 };
 const seconds = option('seconds', 3);
 const connections = option('connections', 16);
+const gzip = args.includes('--gzip');
+if (gzip) args.splice(args.indexOf('--gzip'), 1);
 
 const scenarios = args.length > 0 ? args : [
   '/healthz',
@@ -35,6 +38,8 @@ const scenarios = args.length > 0 ? args : [
   '/gen?count=20',
   '/gen?count=100',
   '/gen?count=100&seed=2024',
+  '/gen?count=100&seed=2024&length=12&brackets=true',
+  '/gen?count=100&answerMin=50&answerMax=100',
   '/gen?count=100&length=12&brackets=true',
 ];
 
@@ -48,7 +53,8 @@ const freePort = async () => {
 };
 
 const get = (agent, port, path) => new Promise((resolve, reject) => {
-  http.get({ agent, host: '127.0.0.1', port, path }, (res) => {
+  const headers = gzip ? { 'Accept-Encoding': 'gzip' } : {};
+  http.get({ agent, host: '127.0.0.1', port, path, headers }, (res) => {
     let bytes = 0;
     res.on('data', (chunk) => { bytes += chunk.length; });
     res.on('end', () => resolve({ status: res.statusCode, bytes }));
@@ -101,7 +107,12 @@ const child = fork(root, [], {
   stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
 });
 
-child.on('exit', (code) => { console.error('the server exited with', code); process.exit(1); });
+let finished = false;
+child.on('exit', (code) => {
+  if (finished) return;
+  console.error('the server exited with', code);
+  process.exit(1);
+});
 
 // Cold start: from spawning the process to the first answered request.
 const agent = new http.Agent({ keepAlive: false });
@@ -122,10 +133,11 @@ for (const path of scenarios) {
 }
 const loadedRss = await rssOf(child);
 
-console.log(`node ${process.version}, ${connections} connections, ${seconds} s per path after a warm-up of the same length`);
+console.log(`node ${process.version}, ${connections} connections${gzip ? ', gzip' : ''}, ${seconds} s per path after a warm-up of the same length`);
 console.log(`cold start to first response: ${coldStart.toFixed(0)} ms`);
 console.log(`memory: ${(idleRss / 2 ** 20).toFixed(1)} MB at idle, ${(loadedRss / 2 ** 20).toFixed(1)} MB after the run`);
 console.table(rows);
 
+finished = true;
 child.kill();
 await once(child, 'exit');
