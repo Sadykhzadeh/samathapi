@@ -60,7 +60,7 @@ test('it goes with negatives=false and brackets, and the options stay whole numb
 });
 
 test('the options stay inside the range, so none can be ruled out by the range', async () => {
-  for (const [min, max] of [[50, 100], [1, 20], [7, 10], [400, 500]]) {
+  for (const [min, max] of [[50, 100], [1, 20], [7, 10], [400, 500], [2000, 2100], [9900, 10000]]) {
     for (const { answer, quizOptions } of await quiz(`answerMin=${min}&answerMax=${max}`)) {
       assert.equal(new Set(quizOptions).size, 4, `${quizOptions}`);
       assert.ok(quizOptions.every((o) => o >= min && o <= max), `${quizOptions} for ${answer} in ${min} to ${max}`);

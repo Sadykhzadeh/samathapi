@@ -101,7 +101,7 @@ is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
 | `max` | how far from zero any number may be, a whole number from `10` to `10000` | `10000` |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
-| `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `1` to `500` with at most `100` between them; both or neither | `10` and `20` |
+| `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `1` to `10000` with at most `100` between them; both or neither | `10` and `20` |
 
 ```sh
 curl 'http://localhost:3000/gen?length=6&brackets=true'
@@ -208,7 +208,7 @@ curl 'http://localhost:3000/gen?answerMin=50&answerMax=100&length=3&seed=7'
 The four options stay inside the range, so a pupil who knows it can rule none
 of them out, and each is as likely to be the answer as the others. The range
 may not be wider than 100 numbers, which keeps the work of building those
-options small, and runs from 1 to 500. It goes with `length`, `brackets`,
+options small, and runs from 1 to 10000. It goes with `length`, `brackets`,
 `negatives`, `count` and `seed`; the range is part of what a seed names.
 
 A range of a few numbers has few tasks to give, so a `count` of 100 with

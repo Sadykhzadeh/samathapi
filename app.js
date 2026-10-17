@@ -117,10 +117,11 @@ const buildOptionSets = ({ min, max }) => {
 };
 
 // Building a range's sets takes a few milliseconds for the widest, so they
-// are kept for the ranges asked for lately.
+// are kept for the ranges asked for lately. A range is told by its two ends,
+// the greatest of which is at most ANSWER_LIMIT, under 16384.
 const optionSetsByRange = new Map();
 const optionSetsFor = (range) => {
-  const key = range.min * 2048 + range.max;
+  const key = range.min * 16384 + range.max;
   let sets = optionSetsByRange.get(key);
   if (sets === undefined) {
     if (optionSetsByRange.size >= 64) optionSetsByRange.delete(optionSetsByRange.keys().next().value);
@@ -174,9 +175,11 @@ const refusing = (generate) => (length, options) => {
 export const COUNT_MAX = 100;
 
 // The answers a request may ask for: whole numbers from 1 to ANSWER_LIMIT,
-// with at most ANSWER_SPAN between the least and the most. The span keeps the
-// work of making the options give nothing away within a few milliseconds.
-export const ANSWER_LIMIT = 500;
+// with at most ANSWER_SPAN between the least and the most. The limit is as far
+// as samathgen lets a number go. The span keeps the work of making the options
+// give nothing away within a few milliseconds: the sets for a range that has
+// not been asked for lately take 3.5 ms at 100 wide, 8.5 at 200, 31 at 500.
+export const ANSWER_LIMIT = 10000;
 export const ANSWER_SPAN = 100;
 
 // The operators a request may name, spelt out because + is a space in a query
