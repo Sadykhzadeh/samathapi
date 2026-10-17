@@ -177,6 +177,30 @@ const complaint = (name, rule, value) => (Array.isArray(value)
   ? `${name} was sent ${value.length} times, send it once`
   : `${name} must be ${rule}, not ${sent(value)}`);
 
+// A parameter this server does not know is ignored, as a client may send
+// more than an older server takes, unless it is a typo of one it does: a
+// teacher who sends bracket=true should hear that it did nothing, not get a
+// worksheet without brackets.
+const PARAMETERS = ['length', 'brackets', 'negatives', 'count', 'seed'];
+
+const distance = (a, b) => {
+  let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const next = [i];
+    for (let j = 1; j <= b.length; j++) {
+      next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    row = next;
+  }
+  return row[b.length];
+};
+
+const misspelt = (name) => {
+  if (name.length < 3 || PARAMETERS.includes(name)) return undefined;
+  const near = PARAMETERS.find((known) => distance(name.toLowerCase(), known) <= (name.length < 5 ? 1 : 2));
+  return near && `unknown parameter ${sent(name)}, did you mean ${near}?`;
+};
+
 const readRequest = (query, config) => {
   const { length, brackets, negatives, count, seed } = query;
   const request = {
@@ -186,7 +210,7 @@ const readRequest = (query, config) => {
     count: undefined,
     seed: undefined,
   };
-  const errors = [];
+  const errors = Object.keys(query).map(misspelt).filter(Boolean);
   if (length !== undefined) {
     const parsed = wholeNumber(length);
     if (parsed >= LENGTH_MIN && parsed <= LENGTH_MAX) request.length = parsed;
