@@ -211,6 +211,8 @@ const complaint = (name, rule, value) => (Array.isArray(value)
 // worksheet without brackets.
 const PARAMETERS = ['length', 'brackets', 'negatives', 'count', 'seed', 'answerMin', 'answerMax'];
 
+const LONGEST = Math.max(...PARAMETERS.map((name) => name.length));
+
 const distance = (a, b) => {
   let row = Array.from({ length: b.length + 1 }, (_, i) => i);
   for (let i = 1; i <= a.length; i++) {
@@ -224,8 +226,10 @@ const distance = (a, b) => {
 };
 
 const misspelt = (name) => {
-  if (name.length < 3 || PARAMETERS.includes(name)) return undefined;
   const limit = name.length < 5 ? 1 : 2;
+  // A name too long to be within `limit` of any of them is not compared: the
+  // work grows with its length, and a query string may be 16 KB of one name.
+  if (name.length < 3 || name.length > LONGEST + limit || PARAMETERS.includes(name)) return undefined;
   let near;
   let nearest = Infinity;
   for (const known of PARAMETERS) {
