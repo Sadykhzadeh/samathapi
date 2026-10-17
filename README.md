@@ -24,6 +24,13 @@ npm start
 `npm test` runs the endpoint tests with Node's built-in runner; there is
 nothing extra to install.
 
+`npm run bench` starts the server and prints how long it took to answer its
+first request, how much memory it holds, and the requests per second and
+latency of each path on keep-alive connections. `node bench/bench.js --seconds 10`
+runs longer, `--connections 64` sends more at once, and `node bench/bench.js '/gen?count=50'`
+measures a path of your own. The client is Node as well, so compare runs on
+one machine rather than numbers between machines.
+
 ## Endpoints
 
 | Endpoint | Returns |
