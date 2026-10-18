@@ -498,6 +498,16 @@ const ALLOWED = 'GET, HEAD, OPTIONS';
 // those of the bodies, which are at most about 13 000 each.
 export const CACHE_BYTES = 4 * 2 ** 20;
 
+// What an entry takes on the heap beyond its strings: the object, its map slot
+// and the headers of its strings, measured at a little over 100 bytes each.
+const ENTRY_OVERHEAD = 128;
+
+// What a seeded answer costs the cache: its key, its body and tag, and the
+// compressed body once there is one. Counting the body alone let a flood of
+// one-line answers fill the heap to many times CACHE_BYTES.
+const costOf = (key, entry) => key.length + entry.body.length + entry.etag.length
+  + (entry.gzip?.length ?? 0) + ENTRY_OVERHEAD;
+
 // How long a client or a cache in between may reuse a seeded answer without
 // asking. Upgrading samathgen can change what a seed names, so not for ever.
 const SEEDED_CACHE_CONTROL = 'public, max-age=3600';
@@ -527,7 +537,7 @@ const matches = (header, etag) => header !== undefined
 // `generate` is mathGen unless a test hands in something else. What comes
 // back is a plain http.Server, not yet listening.
 export const createApp = (config, generate = mathGen) => {
-  const cache = createCache(CACHE_BYTES);
+  const cache = createCache(CACHE_BYTES, costOf);
   const spec = JSON.stringify(buildSpec({
     version,
     lengthMin: LENGTH_MIN,
@@ -602,7 +612,12 @@ export const createApp = (config, generate = mathGen) => {
       });
       return;
     }
-    const body = packed ? (entry.gzip ??= gzipSync(entry.body)) : entry.body;
+    if (packed && entry.gzip === undefined) {
+      entry.gzip = gzipSync(entry.body);
+      // Stored again so that the cache charges for the compressed copy.
+      cache.set(key, entry);
+    }
+    const body = packed ? entry.gzip : entry.body;
     const etag = packed ? `${entry.etag.slice(0, -1)}-gzip"` : entry.etag;
     const headers = { ETag: etag, 'Cache-Control': SEEDED_CACHE_CONTROL, ...(packed && GZIPPED) };
     if (matches(req.headers['if-none-match'], etag)) {
