@@ -360,7 +360,9 @@ const readQuery = (url) => {
   const at = url.indexOf('?');
   if (at === -1) return query;
   for (const [name, value] of new URLSearchParams(url.slice(at + 1))) {
-    query[name] = name in query ? [].concat(query[name], value) : value;
+    if (!(name in query)) query[name] = value;
+    else if (Array.isArray(query[name])) query[name].push(value);
+    else query[name] = [query[name], value];
   }
   return query;
 };
