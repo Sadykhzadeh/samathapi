@@ -245,14 +245,17 @@ const PARAMETERS = ['length', 'brackets', 'negatives', 'operators', 'max', 'coun
 
 const LONGEST = Math.max(...PARAMETERS.map((name) => name.length));
 
+// Two rows swapped back and forth, so that a name costs no allocation per
+// character: a query string may hold a thousand names to compare.
 const distance = (a, b) => {
   let row = Array.from({ length: b.length + 1 }, (_, i) => i);
+  let next = new Array(b.length + 1);
   for (let i = 1; i <= a.length; i++) {
-    const next = [i];
+    next[0] = i;
     for (let j = 1; j <= b.length; j++) {
       next[j] = Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
     }
-    row = next;
+    [row, next] = [next, row];
   }
   return row[b.length];
 };
@@ -262,10 +265,14 @@ const misspelt = (name) => {
   // A name too long to be within `limit` of any of them is not compared: the
   // work grows with its length, and a query string may be 16 KB of one name.
   if (name.length < 3 || name.length > LONGEST + limit || PARAMETERS.includes(name)) return undefined;
+  const lower = name.toLowerCase();
   let near;
   let nearest = Infinity;
   for (const known of PARAMETERS) {
-    const apart = distance(name.toLowerCase(), known.toLowerCase());
+    // Two names of lengths that differ by more than `limit` are never that
+    // close, so the distance is not worked out for them.
+    if (Math.abs(known.length - name.length) > limit) continue;
+    const apart = distance(lower, known.toLowerCase());
     if (apart <= limit && apart < nearest) {
       near = known;
       nearest = apart;
