@@ -241,7 +241,7 @@ const complaint = (name, rule, value) => (Array.isArray(value)
 // more than an older server takes, unless it is a typo of one it does: a
 // teacher who sends bracket=true should hear that it did nothing, not get a
 // worksheet without brackets.
-const PARAMETERS = ['length', 'brackets', 'negatives', 'operators', 'max', 'count', 'seed', 'answerMin', 'answerMax'];
+export const PARAMETERS = ['length', 'brackets', 'negatives', 'operators', 'max', 'count', 'seed', 'answerMin', 'answerMax'];
 
 const LONGEST = Math.max(...PARAMETERS.map((name) => name.length));
 
