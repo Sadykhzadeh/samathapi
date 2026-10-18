@@ -109,6 +109,21 @@ test('a seed asked for again is not drawn again, and says the same', async () =>
   }
 });
 
+test('a flood of tiny seeded answers is not kept past the cache bytes, keys and tags included', async () => {
+  const app = await countingApp();
+  try {
+    await fetch(`${app.base}/gen?c=true&seed=1`);
+    for (let seed = 2; seed <= 30000; seed += 100) {
+      await Promise.all(Array.from({ length: 100 }, (_, i) => fetch(`${app.base}/gen?c=true&seed=${seed + i}`).then((res) => res.arrayBuffer())));
+    }
+    const drawn = app.state.calls;
+    await fetch(`${app.base}/gen?c=true&seed=1`);
+    assert.equal(app.state.calls, drawn + 1, 'seed 1 is still kept after 30 000 others');
+  } finally {
+    app.server.close();
+  }
+});
+
 test('an answer without a seed is drawn every time', async () => {
   const app = await countingApp();
   try {
