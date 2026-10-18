@@ -1,6 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, readConfig } from '../app.js';
+import { ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST, PARAMETERS, SEED_MAX, createApp, readConfig } from '../app.js';
+import { evaluate } from '../evaluate.js';
 
 let server;
 let base;
@@ -37,7 +38,7 @@ test('every path it lists is served, and every path served is listed', async () 
 
 test('the limits it states are the limits the server enforces', async () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
-  assert.deepEqual(Object.keys(parameters).sort(), ['answerMax', 'answerMin', 'brackets', 'c', 'count', 'length', 'max', 'negatives', 'operators', 'seed']);
+  assert.deepEqual(Object.keys(parameters).sort(), [...PARAMETERS, 'c'].sort());
 
   const status = async (query) => (await fetch(`${base}/gen?${query}`)).status;
   const limits = {
@@ -92,6 +93,15 @@ test('the limits it states are the limits the server enforces', async () => {
   assert.equal(await status('operators='), 400);
 });
 
+test('the server reads every parameter the spec lists, and ignores the rest', async () => {
+  for (const name of PARAMETERS) {
+    const res = await fetch(`${base}/gen?${name}=x`);
+    assert.equal(res.status, 400, name);
+    assert.match(await res.text(), new RegExp(`^\\{"error":"${name} must`), name);
+  }
+  assert.equal((await fetch(`${base}/gen?unlisted=x`)).status, 200);
+});
+
 test('the defaults it states are the settings the server runs on', () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
   assert.equal(parameters.brackets.schema.default, 'true');
@@ -111,4 +121,25 @@ test('what it says a task looks like is what a task looks like', async () => {
   const error = await (await fetch(`${base}/gen?length=0`)).json();
   assert.deepEqual(Object.keys(error), spec.components.schemas.Error.required);
   assert.ok(spec.paths['/gen'].get.responses[400] && spec.paths['/gen'].get.responses[500] && spec.paths['/gen'].get.responses[304]);
+});
+
+test('the example task is written the way the server writes one: each bracket is a piece of its own', () => {
+  const { example } = spec.components.schemas.Task.properties.task;
+  const pieces = ['+', '-', '*', '/', '(', ')'];
+  for (const piece of example.filter((item) => typeof item === 'string')) {
+    assert.ok(pieces.includes(piece), `${JSON.stringify(piece)} is not a piece of a task`);
+  }
+  assert.ok(Number.isInteger(evaluate(example.join(''))), example.join(''));
+});
+
+test('the answer range it says a task has by default is the one the server draws from', async () => {
+  const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
+  const rule = 'or from half of a max below 20 up to the max';
+  assert.match(parameters.max.description, new RegExp(rule));
+  assert.match(parameters.answerMin.description, new RegExp(rule));
+  const lines = await (await fetch(`${base}/gen?c=true&count=40&max=10&seed=3`)).text();
+  for (const line of lines.trim().split('\n')) {
+    const answer = Number(line.split(' ').at(-1));
+    assert.ok(answer >= 5 && answer <= 10, line);
+  }
 });

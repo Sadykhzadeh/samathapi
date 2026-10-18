@@ -105,7 +105,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'answerMin',
               in: 'query',
-              description: `The least answer a task may have, with answerMax, which has to come with it, at most ${answerSpan} more. Without them every answer is from 10 to 20. The four options stay inside the range.`,
+              description: `The least answer a task may have, with answerMax, which has to come with it, at most ${answerSpan} more. Without them the answers are from 10 to 20, or from half of a max below 20 up to the max. The four options stay inside the range.`,
               schema: { type: 'integer', minimum: answerLeast, maximum: answerLimit },
             },
             {
@@ -159,7 +159,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
               type: 'array',
               description: 'The task in pieces; task.join("") is the text to show.',
               items: { oneOf: [{ type: 'integer' }, { type: 'string' }] },
-              example: [3, '*', 9, '*', 2, '/', '(4-1)'],
+              example: [3, '*', 9, '*', 2, '/', '(', 4, '-', 1, ')'],
             },
             answer: { type: 'integer' },
             quizOptions: {
