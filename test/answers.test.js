@@ -236,3 +236,16 @@ test('every answer of a wide range turns up, about as often as the others', asyn
   assert.equal(counts.size, 101);
   for (const [answer, count] of counts) assert.ok(count > 15 && count < 70, `${answer} came up ${count} times out of 4000`);
 });
+
+test('a range that has not been asked for lately is not set up again for every place it starts at', () => {
+  // Each of these starts somewhere new and is 100 wide, the widest a request may name.
+  const times = [];
+  for (let k = 0; k < 40; k++) {
+    const range = { min: 1000 + k * 7, max: 1100 + k * 7 };
+    const began = performance.now();
+    drawOptions(range.min + 50, range);
+    times.push(performance.now() - began);
+  }
+  times.sort((a, b) => a - b);
+  assert.ok(times[20] < 2, `median ${times[20].toFixed(2)} ms`);
+});

@@ -90,21 +90,24 @@ const shuffle = (items, random) => {
 // the window alone.
 export const DEFAULT_RANGE = { min: 10, max: 20 };
 
-const buildOptionSets = ({ min, max }) => {
-  if (max - min + 1 < 4) return new Map();
+// Nothing in the sets depends on where a range starts, only on how wide it is,
+// so they are worked out from 0 to the width and moved along by the least
+// number of the range that asks for them.
+const buildOptionSets = (width) => {
+  if (width + 1 < 4) return new Map();
   const sets = [];
-  for (let low = min; low + 3 <= max; low++) {
+  for (let low = 0; low + 3 <= width; low++) {
     for (let places = 1; places < 64; places += 2) {
       const numbers = [0, 1, 2, 3, 4, 5]
         .filter((place) => (places >> place) & 1)
         .map((place) => low + place);
-      if (numbers.length === 4 && numbers[3] <= max) {
+      if (numbers.length === 4 && numbers[3] <= width) {
         sets.push({ numbers, weight: 6 - (numbers[3] - low) });
       }
     }
   }
   const holding = new Map();
-  for (let n = min; n <= max; n++) {
+  for (let n = 0; n <= width; n++) {
     holding.set(n, sets.filter((set) => set.numbers.includes(n)));
   }
   for (let round = 0; round < 200; round++) {
@@ -116,17 +119,17 @@ const buildOptionSets = ({ min, max }) => {
   return holding;
 };
 
-// Building a range's sets takes a few milliseconds for the widest, so they
-// are kept for the ranges asked for lately. A range is told by its two ends,
-// the greatest of which is at most ANSWER_LIMIT, under 16384.
-const optionSetsByRange = new Map();
-const optionSetsFor = (range) => {
-  const key = range.min * 16384 + range.max;
-  let sets = optionSetsByRange.get(key);
+// Building a width's sets takes a few milliseconds for the widest, so they are
+// kept for the widths asked for lately. A request for a range that starts
+// somewhere new costs no building, since only its width is looked up: a flood
+// of distinct ranges used to build a set for each, about 2.7 ms apiece.
+const optionSetsByWidth = new Map();
+const optionSetsFor = (width) => {
+  let sets = optionSetsByWidth.get(width);
   if (sets === undefined) {
-    if (optionSetsByRange.size >= 64) optionSetsByRange.delete(optionSetsByRange.keys().next().value);
-    sets = buildOptionSets(range);
-    optionSetsByRange.set(key, sets);
+    if (optionSetsByWidth.size >= 64) optionSetsByWidth.delete(optionSetsByWidth.keys().next().value);
+    sets = buildOptionSets(width);
+    optionSetsByWidth.set(width, sets);
   }
   return sets;
 };
@@ -146,11 +149,11 @@ const defaultRange = (max) => (max === undefined || max >= 20
 // where the window must stop, and the answer then takes the places in it that
 // have room, each as likely as the others, as samathgen does near its ends.
 export const drawOptions = (answer, range = DEFAULT_RANGE, random = Math.random, { floor = -Infinity, ceiling = Infinity } = {}) => {
-  const sets = optionSetsFor(range).get(answer);
+  const sets = optionSetsFor(range.max - range.min).get(answer - range.min);
   if (sets) {
     let left = random();
     const set = sets.find(({ weight }) => (left -= weight) < 0) ?? sets.at(-1);
-    return shuffle([...set.numbers], random);
+    return shuffle(set.numbers.map((number) => number + range.min), random);
   }
   const below = answer - floor;
   const above = ceiling - answer;
@@ -190,7 +193,7 @@ export const COUNT_MAX = 100;
 // The answers a request may ask for: whole numbers from ANSWER_LEAST to
 // ANSWER_LIMIT, with at most ANSWER_SPAN between the least and the most. The limit is as far
 // as samathgen lets a number go. The span keeps the work of making the options
-// give nothing away within a few milliseconds: the sets for a range that has
+// give nothing away within a few milliseconds: the sets for a width that has
 // not been asked for lately take 3.5 ms at 100 wide, 8.5 at 200, 31 at 500.
 export const ANSWER_LEAST = 0;
 export const ANSWER_LIMIT = 10000;
