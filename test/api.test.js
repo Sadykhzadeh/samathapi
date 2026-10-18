@@ -1002,6 +1002,22 @@ test('c decides over Accept, and an error follows the same format', async () => 
   assert.equal((await list.text()).trim().split('\n').length, 4);
 });
 
+test('a query string of the longest request line is answered in a few milliseconds, not a hundred', async () => {
+  // About 15.6 KB, the most Node reads in a request line; a name sent once
+  // per pair used to cost a copy of every value before it.
+  const path = `/gen?${'q=1&'.repeat(3900)}`;
+  const times = [];
+  for (let i = 0; i < 5; i++) {
+    const began = performance.now();
+    const res = await fetch(base + path);
+    assert.equal(res.status, 200);
+    await res.text();
+    times.push(performance.now() - began);
+  }
+  times.sort((a, b) => a - b);
+  assert.ok(times[2] < 50, `median ${times[2].toFixed(1)} ms`);
+});
+
 test('the answer to /gen says it varies with Accept and Accept-Encoding', async () => {
   for (const query of ['', '?c=true', '?length=99', '?seed=1']) {
     assert.equal((await fetch(`${base}/gen${query}`)).headers.get('vary'), 'Accept, Accept-Encoding', query);
