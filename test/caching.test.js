@@ -1,6 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApp, readConfig } from '../app.js';
+import v8 from 'node:v8';
+import vm from 'node:vm';
+import { CACHE_BYTES, createApp, readConfig } from '../app.js';
 import { createCache } from '../cache.js';
 
 const listen = (app) => new Promise((resolve) => {
@@ -173,4 +175,26 @@ test('the cache holds oldest-first within its bytes, and a read keeps an entry',
   cache.set('huge', { body: 'x'.repeat(11) });
   assert.equal(cache.get('huge'), undefined, 'an answer bigger than the whole cache is not kept');
   assert.equal(cache.size, 1);
+});
+
+// Memory a test can read once the garbage is gone.
+const settledArrayBuffers = () => {
+  v8.setFlagsFromString('--expose-gc');
+  const gc = vm.runInNewContext('gc');
+  gc();
+  return process.memoryUsage().arrayBuffers;
+};
+
+test('the compressed copies of seeded answers take no more memory than the cache is charged for them', async () => {
+  const before = settledArrayBuffers();
+  const app = await listen(createApp(readConfig({})));
+  try {
+    for (let seed = 0; seed < 6000; seed += 50) {
+      await Promise.all(Array.from({ length: 50 }, (_, i) => fetch(`${app.base}/gen?count=20&seed=${seed + i}`).then((res) => res.arrayBuffer())));
+    }
+    const held = settledArrayBuffers() - before;
+    assert.ok(held < 3 * CACHE_BYTES, `${(held / 2 ** 20).toFixed(1)} MB of buffers held for a ${CACHE_BYTES / 2 ** 20} MB cache`);
+  } finally {
+    app.server.close();
+  }
 });
