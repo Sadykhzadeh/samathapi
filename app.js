@@ -616,7 +616,10 @@ export const createApp = (config, generate = mathGen) => {
       return;
     }
     if (packed && entry.gzip === undefined) {
-      entry.gzip = gzipSync(entry.body);
+      // gzipSync returns a view into a 64 KB buffer that other outputs share,
+      // which a cached view would keep alive whole; a plain copy keeps only its
+      // own bytes (a Buffer copy is carved from a shared pool again).
+      entry.gzip = Uint8Array.from(gzipSync(entry.body));
       // Stored again so that the cache charges for the compressed copy.
       cache.set(key, entry);
     }
