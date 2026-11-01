@@ -31,7 +31,8 @@ const toPort = (value) => {
 export const readConfig = (env) => ({
   lengthFrom: toLength(env.lengthFrom, 2),
   lengthTo: toLength(env.lengthTo, 4),
-  brackets: flag(env.brackets),
+  // `never` is what a request may ask for as well.
+  brackets: env.brackets === 'never' ? 'never' : flag(env.brackets),
   // On unless switched off, so only the exact string "false" counts as no.
   negatives: env.negatives !== 'false',
   port: toPort(env.PORT),

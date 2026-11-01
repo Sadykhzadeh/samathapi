@@ -824,6 +824,23 @@ test('readConfig clamps lengths to 2..12 and reads brackets and negatives as fla
   assert.equal(readConfig({ negatives: 'true' }).negatives, true);
 });
 
+test('brackets=never in the environment is the default for every request', async () => {
+  assert.equal(readConfig({ brackets: 'never' }).brackets, 'never');
+  assert.equal(readConfig({ brackets: 'Never' }).brackets, false);
+  const app = await spyApp({ brackets: 'never' });
+  try {
+    await (await fetch(`${app.base}/gen`)).text();
+    assert.equal(app.asked.pop().brackets, 'never');
+    await (await fetch(`${app.base}/gen?brackets=false`)).text();
+    assert.equal(app.asked.pop().brackets, false);
+    const spec = await (await fetch(`${app.base}/openapi.json`)).json();
+    const parameter = spec.paths['/gen'].get.parameters.find((p) => p.name === 'brackets');
+    assert.equal(parameter.schema.default, 'never');
+  } finally {
+    app.server.close();
+  }
+});
+
 test('a path that is not served is a 404 in JSON', async () => {
   for (const path of ['/nope', '/gen/extra', '/__proto__', '/constructor', '/healthz.json']) {
     const res = await fetch(`${base}${path}`);

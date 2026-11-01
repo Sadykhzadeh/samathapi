@@ -95,7 +95,7 @@ is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
 | Parameter | Values | Default |
 | --- | --- | --- |
 | `length` | how many numbers the task has, `2` to `12` | a random length between `lengthFrom` and `lengthTo` |
-| `brackets` | `true`, `false` or `never` | the `brackets` setting, `true` or `false` |
+| `brackets` | `true`, `false` or `never` | the `brackets` setting, `true`, `false` or `never` |
 | `negatives` | `true` or `false` | the `negatives` setting |
 | `operators` | some of `add`, `subtract`, `multiply` and `divide`, separated by commas, each once | all four |
 | `max` | how far from zero any number may be, a whole number from `10` to `10000` | `10000` |
@@ -305,6 +305,6 @@ longer than a client will read.
 | `PORT` | `3000` | Port to listen on |
 | `lengthFrom` | `2` | Fewest terms in a generated task |
 | `lengthTo` | `4` | Most terms in a generated task |
-| `brackets` | `false` | Set to `true` to wrap part of the task in brackets |
+| `brackets` | `false` | Set to `true` to wrap part of the task in brackets, or to `never` to leave out every group, for a class that has not met them; a request's own `brackets` still decides |
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
 
