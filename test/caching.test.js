@@ -83,7 +83,8 @@ test('If-None-Match with the tag is a 304 with no body', async () => {
 test('the description has a tag, and If-None-Match with it is a 304 with no body', async () => {
   const first = await fetch(`${base}/openapi.json`);
   const etag = first.headers.get('etag');
-  assert.match(etag, /^"[A-Za-z0-9_-]{22}"$/);
+  // fetch asks for gzip, so this is the tag of the compressed form.
+  assert.match(etag, /^"[A-Za-z0-9_-]{22}(-gzip)?"$/);
   const body = await first.text();
   assert.ok(body.length > 0);
   for (const header of [etag, `W/${etag}`, `"other", ${etag}`, '*']) {

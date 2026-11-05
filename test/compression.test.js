@@ -87,3 +87,24 @@ test('fetch, which unpacks gzip by itself, reads the same tasks', async () => {
   const tasks = await (await fetch(`http://127.0.0.1:${port}/gen?seed=3&count=100`)).json();
   assert.equal(tasks.length, 100);
 });
+
+test('the description is gzipped for a client that accepts it, under a tag of its own', async () => {
+  const plain = await raw('/openapi.json', { 'Accept-Encoding': 'identity' });
+  assert.equal(plain.res.headers['content-encoding'], undefined);
+  assert.equal(plain.res.headers.vary, 'Accept-Encoding');
+
+  const packed = await raw('/openapi.json', { 'Accept-Encoding': 'gzip' });
+  assert.equal(packed.res.headers['content-encoding'], 'gzip');
+  assert.equal(Number(packed.res.headers['content-length']), packed.body.length);
+  assert.ok(packed.body.length < plain.body.length / 2, `${packed.body.length} against ${plain.body.length}`);
+  assert.deepEqual(gunzipSync(packed.body), plain.body);
+  assert.match(packed.res.headers['content-type'], /^application\/json/);
+  assert.match(packed.res.headers.etag, /^"[A-Za-z0-9_-]{22}-gzip"$/);
+  assert.notEqual(packed.res.headers.etag, plain.res.headers.etag);
+
+  const same = await raw('/openapi.json', { 'Accept-Encoding': 'gzip', 'If-None-Match': packed.res.headers.etag });
+  assert.equal(same.res.statusCode, 304);
+  assert.equal(same.body.length, 0);
+  const other = await raw('/openapi.json', { 'Accept-Encoding': 'gzip', 'If-None-Match': plain.res.headers.etag });
+  assert.equal(other.res.statusCode, 200, 'the tag of the other representation is not this one');
+});

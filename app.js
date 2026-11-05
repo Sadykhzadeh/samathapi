@@ -558,6 +558,9 @@ export const createApp = (config, generate = mathGen) => {
   }));
 
   const specTag = etagOf(spec);
+  // Compressed once, here, for it never changes while the server runs.
+  const specGzip = Uint8Array.from(gzipSync(spec));
+  const specGzipTag = `${specTag.slice(0, -1)}-gzip"`;
   const generator = refusing(generate);
 
   const gen = (req, res, query) => {
@@ -640,12 +643,14 @@ export const createApp = (config, generate = mathGen) => {
     '/': (req, res) => send(res, 200, TEXT_TYPE, 'Hello World'),
     '/healthz': (req, res) => send(res, 200, JSON_TYPE, '{"ok":true}', { 'Cache-Control': 'no-store' }),
     '/openapi.json': (req, res) => {
-      const headers = { ETag: specTag, 'Cache-Control': 'public, max-age=3600' };
-      if (matches(req.headers['if-none-match'], specTag)) {
+      const packed = acceptsGzip(req.headers['accept-encoding']);
+      const etag = packed ? specGzipTag : specTag;
+      const headers = { ETag: etag, 'Cache-Control': 'public, max-age=3600', Vary: 'Accept-Encoding', ...(packed && GZIPPED) };
+      if (matches(req.headers['if-none-match'], etag)) {
         res.writeHead(304, { ...EVERY_ANSWER, ...headers });
         res.end();
       } else {
-        send(res, 200, JSON_TYPE, spec, headers);
+        send(res, 200, JSON_TYPE, packed ? specGzip : spec, headers);
       }
     },
     '/gen': (req, res) => gen(req, res, readQuery(req.url)),
