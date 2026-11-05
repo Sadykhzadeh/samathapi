@@ -557,6 +557,7 @@ export const createApp = (config, generate = mathGen) => {
     config,
   }));
 
+  const specTag = etagOf(spec);
   const generator = refusing(generate);
 
   const gen = (req, res, query) => {
@@ -638,7 +639,15 @@ export const createApp = (config, generate = mathGen) => {
   const routes = new Map(Object.entries({
     '/': (req, res) => send(res, 200, TEXT_TYPE, 'Hello World'),
     '/healthz': (req, res) => send(res, 200, JSON_TYPE, '{"ok":true}', { 'Cache-Control': 'no-store' }),
-    '/openapi.json': (req, res) => send(res, 200, JSON_TYPE, spec, { 'Cache-Control': 'public, max-age=3600' }),
+    '/openapi.json': (req, res) => {
+      const headers = { ETag: specTag, 'Cache-Control': 'public, max-age=3600' };
+      if (matches(req.headers['if-none-match'], specTag)) {
+        res.writeHead(304, { ...EVERY_ANSWER, ...headers });
+        res.end();
+      } else {
+        send(res, 200, JSON_TYPE, spec, headers);
+      }
+    },
     '/gen': (req, res) => gen(req, res, readQuery(req.url)),
   }));
 

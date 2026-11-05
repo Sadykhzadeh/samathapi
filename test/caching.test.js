@@ -80,6 +80,25 @@ test('If-None-Match with the tag is a 304 with no body', async () => {
   assert.equal(await stale.text(), body);
 });
 
+test('the description has a tag, and If-None-Match with it is a 304 with no body', async () => {
+  const first = await fetch(`${base}/openapi.json`);
+  const etag = first.headers.get('etag');
+  assert.match(etag, /^"[A-Za-z0-9_-]{22}"$/);
+  const body = await first.text();
+  assert.ok(body.length > 0);
+  for (const header of [etag, `W/${etag}`, `"other", ${etag}`, '*']) {
+    const res = await fetch(`${base}/openapi.json`, { headers: { 'If-None-Match': header } });
+    assert.equal(res.status, 304, header);
+    assert.equal(await res.text(), '', header);
+    assert.equal(res.headers.get('etag'), etag);
+    assert.equal(res.headers.get('cache-control'), 'public, max-age=3600');
+    assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  }
+  const stale = await fetch(`${base}/openapi.json`, { headers: { 'If-None-Match': '"something-else"' } });
+  assert.equal(stale.status, 200);
+  assert.equal(await stale.text(), body);
+});
+
 test('a seed asked for again is not drawn again, and says the same', async () => {
   const app = await countingApp();
   try {

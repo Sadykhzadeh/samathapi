@@ -46,7 +46,14 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
       '/openapi.json': {
         get: {
           summary: 'This description',
-          responses: { 200: { description: 'An OpenAPI 3 document', content: { 'application/json': { schema: { type: 'object' } } } } },
+          responses: {
+            200: {
+              description: 'An OpenAPI 3 document',
+              headers: { ETag: { description: 'A matching If-None-Match is answered with 304.', schema: { type: 'string' } } },
+              content: { 'application/json': { schema: { type: 'object' } } },
+            },
+            304: { description: 'The If-None-Match tag is current' },
+          },
         },
       },
       '/gen': {

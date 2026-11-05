@@ -279,6 +279,8 @@ That is a seeded `count=100` at 23 000 requests per second, where drawing it
 each time gave 4 200, and a seeded 12-term quiz with brackets at 18 000 where it
 gave 1 700.
 An answer without a seed is new every time and says `Cache-Control: no-store`.
+`/openapi.json` has an `ETag` too, so a client that kept it for the hour asks
+again with `If-None-Match` and is told `304` instead of being sent it twice.
 
 An answer of 1 KB or more, a `count` of 16 or so, is gzipped for a client whose
 `Accept-Encoding` lists `gzip`, which `curl --compressed` and every browser
