@@ -106,7 +106,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'count',
               in: 'query',
-              description: 'How many tasks. The answer is then a list, also for 1; without it the answer is one task. No task comes twice in a list unless a seed is given.',
+              description: 'How many tasks. The answer is then a list, also for 1; without it the answer is one task. No task comes twice in a list unless a seed is given or the range has too few tasks to find a new one; then a repeat is served after at most 500 redraws in all.',
               schema: { type: 'integer', minimum: 1, maximum: countMax },
             },
             {

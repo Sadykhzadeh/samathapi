@@ -64,6 +64,8 @@ test('the limits it states are the limits the server enforces', async () => {
     assert.equal(schema.maximum, ANSWER_LIMIT, name);
   }
   assert.match(parameters.answerMin.description, new RegExp(`at most ${ANSWER_SPAN} more`));
+  // A narrow range has few tasks, and a list then repeats one: the spec has to say so.
+  assert.match(parameters.count.description, /repeat/);
   const other = { answerMin: 'answerMax', answerMax: 'answerMin' };
   for (const name of Object.keys(other)) {
     assert.equal(await status(`${name}=1&${other[name]}=1`), 200, name);
