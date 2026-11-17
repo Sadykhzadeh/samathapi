@@ -671,7 +671,8 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
 
   const handle = (req, res) => {
     const at = req.url.indexOf('?');
-    let path = (at === -1 ? req.url : req.url.slice(0, at)).toLowerCase();
+    // A proxy names the target in full, as http://host/gen, and means the same path.
+    let path = (at === -1 ? req.url : req.url.slice(0, at)).replace(/^https?:\/\/[^/]*/i, '').toLowerCase() || '/';
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     const route = routes.get(path);
     if (!route) {

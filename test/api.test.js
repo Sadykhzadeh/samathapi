@@ -866,6 +866,18 @@ test('a trailing slash or capitals still reach the endpoint', async () => {
   }
 });
 
+test('a target sent as a full URL, as a proxy sends it, reaches the same endpoint', async () => {
+  const { port } = server.address();
+  for (const target of [`http://127.0.0.1:${port}/healthz`, `http://example.test/gen?c=true`, `HTTP://example.test/gen/`]) {
+    const socket = net.connect(port, '127.0.0.1');
+    await once(socket, 'connect');
+    socket.end(`GET ${target} HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n`);
+    let reply = '';
+    for await (const chunk of socket) reply += chunk;
+    assert.match(reply, /^HTTP\/1\.1 200 /, target);
+  }
+});
+
 test('a method the endpoint does not take is a 405 that lists the ones it does', async () => {
   for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
     for (const path of ['/', '/healthz', '/gen']) {
