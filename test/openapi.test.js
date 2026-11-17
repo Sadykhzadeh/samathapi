@@ -145,3 +145,62 @@ test('the answer range it says a task has by default is the one the server draws
     assert.ok(answer >= 5 && answer <= 10, line);
   }
 });
+
+test('every response the spec documents is given, with the type and the headers it names', async () => {
+  const exercised = new Set();
+  const reply = async (path, init, status) => {
+    const res = await fetch(`${base}${path}`, init);
+    exercised.add(`${new URL(path, base).pathname} ${init?.method ?? 'GET'} ${status ?? res.status}`);
+    return res;
+  };
+  const json = async (res) => JSON.parse(await res.text());
+
+  let res = await reply('/', undefined, 200);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^text\/plain/);
+  await res.arrayBuffer();
+
+  res = await reply('/healthz', undefined, 200);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  assert.deepEqual(await json(res), { ok: true });
+
+  res = await reply('/openapi.json', undefined, 200);
+  const specTag = res.headers.get('etag');
+  assert.ok(specTag, 'openapi.json names an ETag');
+  await res.arrayBuffer();
+  res = await reply('/openapi.json', { headers: { 'If-None-Match': specTag } }, 304);
+  assert.equal(res.status, 304);
+
+  res = await reply('/gen?c=true', undefined, 200);
+  assert.match(res.headers.get('content-type'), /^text\/plain/);
+  await res.arrayBuffer();
+
+  res = await reply('/gen?count=2', undefined, 200);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  const list = await json(res);
+  assert.ok(Array.isArray(list) && list.length === 2, 'count=2 is an array of two tasks');
+  assert.deepEqual(Object.keys(list[0]).sort(), spec.components.schemas.Task.required.slice().sort());
+
+  res = await reply('/gen?seed=7', undefined, 200);
+  assert.match(res.headers.get('cache-control'), /max-age=3600/);
+  const seedTag = res.headers.get('etag');
+  assert.ok(seedTag, 'a seeded answer names an ETag');
+  await res.arrayBuffer();
+  res = await reply('/gen?seed=7', { headers: { 'If-None-Match': seedTag } }, 304);
+  assert.equal(res.status, 304);
+
+  res = await reply('/gen?length=0', undefined, 400);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  assert.deepEqual(Object.keys(await json(res)), spec.components.schemas.Error.required);
+
+  // A 500 needs a generator that fails, which no input here causes.
+  const documented = [];
+  for (const [path, item] of Object.entries(spec.paths)) {
+    for (const [method, operation] of Object.entries(item)) {
+      for (const code of Object.keys(operation.responses)) {
+        if (code !== '500') documented.push(`${path} ${method.toUpperCase()} ${code}`);
+      }
+    }
+  }
+  assert.deepEqual(documented.filter((response) => !exercised.has(response)), []);
+});
