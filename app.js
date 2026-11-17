@@ -7,6 +7,16 @@ import { createCache } from './cache.js';
 import { evaluate } from './evaluate.js';
 import { buildSpec } from './openapi.js';
 
+// Node's own defaults are 300 s for a whole request and 60 s for its headers,
+// which lets a client that sends half a request line hold a socket for five
+// minutes. These are generous for a real client on a slow link.
+export const REQUEST_TIMEOUT_MS = 60_000;
+export const HEADERS_TIMEOUT_MS = 20_000;
+export const KEEP_ALIVE_TIMEOUT_MS = 5_000;
+// Node only looks for the timeouts above this often, so a header timeout is
+// otherwise enforced up to 30 s late.
+export const CHECK_INTERVAL_MS = 5_000;
+
 // Env values are strings and every non-empty string is truthy, so only the
 // exact string "true" counts as yes.
 export const flag = (value) => value === 'true';
@@ -540,7 +550,7 @@ const matches = (header, etag) => header !== undefined
 
 // `generate` is mathGen unless a test hands in something else. What comes
 // back is a plain http.Server, not yet listening.
-export const createApp = (config, generate = mathGen) => {
+export const createApp = (config, generate = mathGen, timeouts = {}) => {
   const cache = createCache(CACHE_BYTES, costOf);
   const spec = JSON.stringify(buildSpec({
     version,
@@ -681,7 +691,7 @@ export const createApp = (config, generate = mathGen) => {
     }
   };
 
-  return http.createServer((req, res) => {
+  const server = http.createServer((req, res) => {
     try {
       handle(req, res);
     } catch (error) {
@@ -690,4 +700,9 @@ export const createApp = (config, generate = mathGen) => {
       else res.destroy();
     }
   });
+  server.requestTimeout = timeouts.request ?? REQUEST_TIMEOUT_MS;
+  server.headersTimeout = timeouts.headers ?? HEADERS_TIMEOUT_MS;
+  server.keepAliveTimeout = timeouts.keepAlive ?? KEEP_ALIVE_TIMEOUT_MS;
+  server.connectionsCheckingInterval = timeouts.check ?? CHECK_INTERVAL_MS;
+  return server;
 };

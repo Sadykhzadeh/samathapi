@@ -1,5 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import net from 'node:net';
 import { mathGen } from 'samathgen';
 import { COUNT_MAX, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, drawOptions, drawSound, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
@@ -1046,4 +1048,20 @@ test('a query string past the header limit is refused, and the server goes on an
   assert.equal(res.status, 431);
   await res.arrayBuffer();
   assert.equal((await fetch(`${base}/healthz`)).status, 200);
+});
+
+test('a client that stalls mid-request-line is dropped at the headers timeout, and others are still served', { timeout: 15000 }, async () => {
+  const app = createApp(readConfig({}), undefined, { headers: 300, request: 5000, keepAlive: 1000, check: 50 });
+  const { server: slow, base: slowBase } = await listen(app);
+  const socket = net.connect(slow.address().port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.resume();
+  socket.write('GET /gen?seed=1 HTT');
+  const started = Date.now();
+  const closed = once(socket, 'close');
+  assert.equal((await fetch(`${slowBase}/healthz`)).status, 200);
+  await closed;
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed >= 250 && elapsed < 4000, `dropped after ${elapsed} ms`);
+  slow.close();
 });
