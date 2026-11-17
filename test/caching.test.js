@@ -197,22 +197,27 @@ test('the cache holds oldest-first within its bytes, and a read keeps an entry',
   assert.equal(cache.size, 1);
 });
 
-// Memory a test can read once the garbage is gone.
-const settledArrayBuffers = () => {
+// Memory a test can read once the garbage is gone. The buffers of a response
+// read just before a collection are only released once the event loop has
+// run, so a single collection can still count tens of megabytes of them.
+const settledArrayBuffers = async () => {
   v8.setFlagsFromString('--expose-gc');
   const gc = vm.runInNewContext('gc');
-  gc();
+  for (let i = 0; i < 3; i++) {
+    await new Promise((resolve) => setImmediate(resolve));
+    gc();
+  }
   return process.memoryUsage().arrayBuffers;
 };
 
 test('the compressed copies of seeded answers take no more memory than the cache is charged for them', async () => {
-  const before = settledArrayBuffers();
+  const before = await settledArrayBuffers();
   const app = await listen(createApp(readConfig({})));
   try {
     for (let seed = 0; seed < 6000; seed += 50) {
       await Promise.all(Array.from({ length: 50 }, (_, i) => fetch(`${app.base}/gen?count=20&seed=${seed + i}`).then((res) => res.arrayBuffer())));
     }
-    const held = settledArrayBuffers() - before;
+    const held = (await settledArrayBuffers()) - before;
     assert.ok(held < 3 * CACHE_BYTES, `${(held / 2 ** 20).toFixed(1)} MB of buffers held for a ${CACHE_BYTES / 2 ** 20} MB cache`);
   } finally {
     app.server.close();
