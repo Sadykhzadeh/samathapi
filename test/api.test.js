@@ -1040,3 +1040,10 @@ test('the answer to /gen says it varies with Accept and Accept-Encoding', async 
     assert.equal((await fetch(`${base}/gen${query}`)).headers.get('vary'), 'Accept, Accept-Encoding', query);
   }
 });
+
+test('a query string past the header limit is refused, and the server goes on answering', async () => {
+  const res = await fetch(`${base}/gen?x=${'a'.repeat(20_000)}`);
+  assert.equal(res.status, 431);
+  await res.arrayBuffer();
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
+});
