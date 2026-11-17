@@ -25,8 +25,11 @@ export const flag = (value) => value === 'true';
 // longer than a client such as SaMathCLI reads back.
 export const LENGTH_MIN = 2;
 export const LENGTH_MAX = 12;
+// Whole numbers only: parseInt would read "3.5" as 3 and "8080x" as 8080.
+const wholeSetting = (value) => (/^-?[0-9]+$/.test(value ?? '') ? Number(value) : NaN);
+
 const toLength = (value, fallback) => {
-  const parsed = Number.parseInt(value ?? '', 10);
+  const parsed = wholeSetting(value);
   if (!Number.isInteger(parsed)) return fallback;
   return Math.min(Math.max(parsed, LENGTH_MIN), LENGTH_MAX);
 };
@@ -34,7 +37,7 @@ const toLength = (value, fallback) => {
 // A number that is not a port would make listen() throw before the server
 // could say anything, so it falls back like any other unusable value.
 const toPort = (value) => {
-  const parsed = Number.parseInt(value ?? '', 10);
+  const parsed = wholeSetting(value);
   return parsed >= 1 && parsed <= 65535 ? parsed : 3000;
 };
 

@@ -809,6 +809,14 @@ test('readConfig falls back on anything that is not a whole number', () => {
   );
 });
 
+test('readConfig does not read a whole number out of a setting that has more in it', () => {
+  assert.deepEqual(
+    readConfig({ lengthFrom: '3.5', lengthTo: '4 apples', PORT: '8080x' }),
+    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, port: 3000 },
+  );
+  assert.equal(readConfig({ lengthTo: '-3' }).lengthTo, 2);
+});
+
 test('readConfig falls back on a PORT that is not a port', () => {
   for (const PORT of ['0', '-1', '65536', '70000']) {
     assert.equal(readConfig({ PORT }).port, 3000, PORT);
