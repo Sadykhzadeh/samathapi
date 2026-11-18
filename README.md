@@ -53,9 +53,11 @@ keeps it near 85 MB at the same throughput, for a host with little memory.
 | `GET /gen?c=true` | plain text `<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>`, the shape [SaMathCLI](https://got.az/azer/samathcli) parses |
 
 Only the exact string `true` turns `c` on; anything else, `false` included,
-returns JSON. Without a `c`, the `Accept` header decides: a client that asks
-for `text/plain` ahead of JSON gets the plain line, so
-`/gen?c=true` and the request below are the same answer. A browser or `curl`
+returns JSON. Without a `c`, the `Accept` header decides: a client that gives
+`text/plain` a higher q than JSON gets the plain line, so
+`/gen?c=true` and the request below are the same answer. When the two have the
+same q, as in `text/plain, application/json`, the answer is JSON: RFC 9110
+leaves a tie to the server, and JSON is the one it gives. A browser or `curl`
 with no header, which accept anything, get JSON. Errors follow the same
 choice, and the answer carries `Vary: Accept, Accept-Encoding`.
 

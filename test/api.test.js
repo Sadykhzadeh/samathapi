@@ -1030,6 +1030,13 @@ test('Accept: text/plain asks for the CLI line when c does not say', async () =>
   assert.match((await fetch(`${base}/gen?seed=9`)).headers.get('content-type'), /^application\/json/, 'no Accept at all');
 });
 
+test('a tie between text/plain and JSON is JSON, whichever is named first', async () => {
+  for (const accept of ['text/plain, application/json', 'application/json, text/plain', 'text/plain;q=0.5, application/json;q=0.5']) {
+    const res = await fetch(`${base}/gen?seed=9`, { headers: { Accept: accept } });
+    assert.match(res.headers.get('content-type'), /^application\/json/, accept);
+  }
+});
+
 test('c decides over Accept, and an error follows the same format', async () => {
   const withAccept = (query, accept) => fetch(`${base}/gen?${query}`, { headers: { Accept: accept } });
   assert.match((await withAccept('c=false', 'text/plain')).headers.get('content-type'), /^application\/json/);
