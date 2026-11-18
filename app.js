@@ -489,9 +489,11 @@ const TEXT_TYPE = 'text/plain; charset=utf-8';
 
 // The API is public and carries no credentials, so any page may read it, and
 // an error as well as an answer, or a script could not show why it failed.
-// nosniff because a plain-text answer repeats a value from the request.
+// nosniff because a plain-text answer repeats a value from the request, and
+// no policy because an answer loads nothing and runs nothing.
 const EVERY_ANSWER = {
   'Access-Control-Allow-Origin': '*',
+  'Content-Security-Policy': "default-src 'none'",
   'X-Content-Type-Options': 'nosniff',
 };
 

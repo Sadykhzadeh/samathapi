@@ -987,6 +987,7 @@ test('every answer, errors included, may be read from a page on another origin',
       const res = await fetch(url, { method });
       assert.equal(res.headers.get('access-control-allow-origin'), '*', `${method} ${url} ${res.status}`);
       assert.equal(res.headers.get('x-content-type-options'), 'nosniff', `${method} ${url}`);
+      assert.equal(res.headers.get('content-security-policy'), "default-src 'none'", `${method} ${url}`);
       await res.text();
     }
   } finally {
