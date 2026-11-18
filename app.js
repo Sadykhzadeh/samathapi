@@ -690,6 +690,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
         'Access-Control-Allow-Methods': ALLOWED,
         'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'Accept',
         'Access-Control-Max-Age': '86400',
+        Vary: 'Access-Control-Request-Headers',
       });
       res.end();
     } else {

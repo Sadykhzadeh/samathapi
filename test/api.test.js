@@ -1009,6 +1009,7 @@ test('a preflight is answered with the methods and the headers asked about', asy
   assert.equal(res.headers.get('access-control-allow-methods'), 'GET, HEAD, OPTIONS');
   assert.equal(res.headers.get('access-control-allow-headers'), 'x-class, accept');
   assert.equal(res.headers.get('access-control-max-age'), '86400');
+  assert.equal(res.headers.get('vary'), 'Access-Control-Request-Headers');
   const plain = await fetch(`${base}/gen`, { method: 'OPTIONS' });
   assert.equal(plain.headers.get('access-control-allow-headers'), 'Accept');
 });
