@@ -786,6 +786,15 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
       else res.destroy();
     }
   });
+  // A CONNECT gets the 405 that any other method the server does not take gets,
+  // and its socket is closed once that is written.
+  server.on('connect', (req, socket) => {
+    const res = new http.ServerResponse(req);
+    if (config.accessLog) logAccess(req, res);
+    res.assignSocket(socket);
+    res.on('finish', () => socket.end());
+    send(res, 405, JSON_TYPE, '{"error":"method not allowed"}', { Allow: ALLOWED, Connection: 'close' });
+  });
   server.requestTimeout = timeouts.request ?? REQUEST_TIMEOUT_MS;
   server.headersTimeout = timeouts.headers ?? HEADERS_TIMEOUT_MS;
   server.keepAliveTimeout = timeouts.keepAlive ?? KEEP_ALIVE_TIMEOUT_MS;

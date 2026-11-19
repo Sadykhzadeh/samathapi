@@ -988,6 +988,19 @@ test('a trailing slash or capitals still reach the endpoint', async () => {
   }
 });
 
+test('a CONNECT gets the 405 the other methods get, and its connection is closed after it', async () => {
+  const { port } = server.address();
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.end('CONNECT example.test:443 HTTP/1.1\r\nHost: example.test:443\r\n\r\n');
+  let reply = '';
+  for await (const chunk of socket) reply += chunk;
+  assert.match(reply, /^HTTP\/1\.1 405 Method Not Allowed\r\n/);
+  assert.match(reply, /\r\nAllow: GET, HEAD, OPTIONS\r\n/);
+  assert.match(reply, /\r\nAccess-Control-Allow-Origin: \*\r\n/);
+  assert.ok(reply.endsWith('{"error":"method not allowed"}'), reply);
+});
+
 test('a target sent as a full URL, as a proxy sends it, reaches the same endpoint', async () => {
   const { port } = server.address();
   for (const target of [`http://127.0.0.1:${port}/healthz`, `http://example.test/gen?c=true`, `HTTP://example.test/gen/`]) {
