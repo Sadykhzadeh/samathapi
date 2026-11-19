@@ -81,7 +81,8 @@ test('the limits it states are the limits the server enforces', async () => {
   assert.deepEqual(parameters.brackets.schema.enum, ['true', 'false', 'never']);
   for (const value of parameters.brackets.schema.enum) assert.equal(await status(`brackets=${value}`), 200, value);
   assert.equal(await status('brackets=maybe'), 400);
-  assert.deepEqual(parameters.c.schema.enum, ['true', 'false']);
+  assert.equal(await status('c=maybe'), 200);
+  assert.match(parameters.c.description, /anything else for JSON/);
 
   const { schema: operators } = parameters.operators;
   assert.equal(parameters.operators.style, 'form');

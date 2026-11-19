@@ -68,8 +68,8 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'c',
               in: 'query',
-              description: 'true for the plain-text line "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", one per task; anything else for JSON. Decides over Accept.',
-              schema: { type: 'string', enum: ['true', 'false'] },
+              description: 'true for the plain-text line "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", one per task; anything else for JSON, false included. Without it the Accept header decides.',
+              schema: { type: 'string' },
             },
             {
               name: 'length',
