@@ -1016,6 +1016,15 @@ test('a preflight is answered with the methods and the headers asked about', asy
   assert.equal(plain.headers.get('access-control-allow-headers'), 'Accept');
 });
 
+test('a page on another origin is allowed to read the ETag of an answer and the Allow of a refused method', async () => {
+  const origin = { Origin: 'https://class.example' };
+  for (const [path, init] of [['/gen?seed=5', {}], ['/openapi.json', {}], ['/gen', { method: 'POST' }]]) {
+    const res = await fetch(`${base}${path}`, { ...init, headers: origin });
+    await res.arrayBuffer();
+    assert.equal(res.headers.get('access-control-expose-headers'), 'ETag, Allow', path);
+  }
+});
+
 test('Accept: text/plain asks for the CLI line when c does not say', async () => {
   const text = (accept) => fetch(`${base}/gen?seed=9`, { headers: { Accept: accept } });
   for (const accept of ['text/plain', 'text/*', 'text/plain, application/json;q=0.5', 'application/json;q=0.1, text/plain', 'TEXT/PLAIN']) {

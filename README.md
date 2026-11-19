@@ -71,8 +71,8 @@ Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
 `node:http`, with no framework between it and the generator.
 
 Every answer, an error too, carries `Access-Control-Allow-Origin: *`, so a page
-on any origin can call the API from the browser, and a preflight `OPTIONS` is
-answered with `204`.
+on any origin can call the API from the browser and read its `ETag` and `Allow`,
+and a preflight `OPTIONS` is answered with `204`.
 
 ### The task as JSON
 

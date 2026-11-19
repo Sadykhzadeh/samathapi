@@ -494,6 +494,7 @@ const TEXT_TYPE = 'text/plain; charset=utf-8';
 // no policy because an answer loads nothing and runs nothing.
 const EVERY_ANSWER = {
   'Access-Control-Allow-Origin': '*',
+  'Access-Control-Expose-Headers': 'ETag, Allow',
   'Content-Security-Policy': "default-src 'none'",
   'X-Content-Type-Options': 'nosniff',
 };
