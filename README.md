@@ -24,7 +24,7 @@ npm start
 On `SIGTERM` or `SIGINT`, which is what `docker stop`, systemd and Ctrl-C
 send, the server stops taking connections, answers the requests it has and
 exits with code 0; one still open after 10 seconds is cut and the exit code
-is 1.
+is 1. A second signal cuts the ones still open at once, with the same code.
 
 `npm test` runs the endpoint tests with Node's built-in runner; there is
 nothing extra to install.

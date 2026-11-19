@@ -29,7 +29,12 @@ server.prependListener('request', (req, res) => {
 });
 
 const stop = (signal) => {
-  if (stopping) return;
+  if (stopping) {
+    // A second signal does not wait out the grace period.
+    console.error(`${signal} received again, closing open connections now`);
+    server.closeAllConnections();
+    process.exit(1);
+  }
   stopping = true;
   console.log(`${signal} received, finishing open requests`);
   server.close(() => process.exit(0));
