@@ -312,4 +312,5 @@ longer than a client will read.
 | `lengthTo` | `4` | Most terms in a generated task |
 | `brackets` | `false` | Set to `true` to wrap part of the task in brackets, or to `never` to leave out every group, for a class that has not met them; a request's own `brackets` still decides |
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
+| `accessLog` | `false` | Set to `true` to print one line to stdout per answer: method, path without its query string, status and time taken, such as `GET /gen 200 0.4 ms` |
 

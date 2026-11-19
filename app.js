@@ -48,6 +48,7 @@ export const readConfig = (env) => ({
   brackets: env.brackets === 'never' ? 'never' : flag(env.brackets),
   // On unless switched off, so only the exact string "false" counts as no.
   negatives: env.negatives !== 'false',
+  accessLog: flag(env.accessLog),
   port: toPort(env.PORT),
 });
 
@@ -507,6 +508,18 @@ const send = (res, status, type, body, headers) => {
   res.end(body);
 };
 
+// One line per answer on stdout, for a log collector. The query string is left
+// out, since a parameter is not something a log should keep; a request that
+// ends before its answer is complete is logged as aborted.
+const logAccess = (req, res) => {
+  const began = process.hrtime.bigint();
+  res.on('close', () => {
+    const took = Number(process.hrtime.bigint() - began) / 1e6;
+    const status = res.writableFinished ? res.statusCode : 'aborted';
+    console.log(`${req.method} ${req.url.split('?')[0]} ${status} ${took.toFixed(1)} ms`);
+  });
+};
+
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 const ALLOWED = 'GET, HEAD, OPTIONS';
@@ -699,6 +712,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
   };
 
   const server = http.createServer((req, res) => {
+    if (config.accessLog) logAccess(req, res);
     try {
       handle(req, res);
     } catch (error) {

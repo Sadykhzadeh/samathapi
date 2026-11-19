@@ -84,3 +84,37 @@ test('SIGTERM stops the server with exit code 0 even with a connection left open
   assert.match(server.output.stdout, /SIGTERM received/);
   socket.destroy();
 });
+
+test('accessLog=true prints a line per answer with the method, path, status and time, and no query string', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), accessLog: 'true' });
+  try {
+    await server.listening;
+    const base = `http://127.0.0.1:${port}`;
+    await (await fetch(`${base}/gen?seed=99991&c=true`)).text();
+    await (await fetch(`${base}/nope`)).text();
+    await (await fetch(`${base}/healthz`, { method: 'HEAD' })).text();
+  } finally {
+    server.child.send('stop');
+    assert.equal(await server.exited, 0);
+  }
+  const lines = server.output.stdout.trim().split('\n').filter((line) => /^(GET|HEAD) /.test(line));
+  assert.equal(lines.length, 3, server.output.stdout);
+  assert.match(lines[0], /^GET \/gen 200 [0-9.]+ ms$/);
+  assert.match(lines[1], /^GET \/nope 404 [0-9.]+ ms$/);
+  assert.match(lines[2], /^HEAD \/healthz 200 [0-9.]+ ms$/);
+  assert.ok(!server.output.stdout.includes('seed'), server.output.stdout);
+});
+
+test('without accessLog the server prints nothing but its address', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port) });
+  try {
+    await server.listening;
+    await (await fetch(`http://127.0.0.1:${port}/gen?c=true`)).text();
+  } finally {
+    server.child.send('stop');
+    assert.equal(await server.exited, 0);
+  }
+  assert.equal(server.output.stdout.trim(), `http://localhost:${port}\nSIGTERM received, finishing open requests`);
+});

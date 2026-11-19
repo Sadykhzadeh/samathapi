@@ -802,17 +802,17 @@ test('a seed it cannot honour is a 400 that says why', async () => {
 });
 
 test('readConfig falls back on anything that is not a whole number', () => {
-  assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, port: 3000 });
+  assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, accessLog: false, port: 3000 });
   assert.deepEqual(
     readConfig({ lengthFrom: 'abc', lengthTo: '', brackets: 'yes', negatives: 'no', PORT: 'x' }),
-    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, port: 3000 },
+    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, accessLog: false, port: 3000 },
   );
 });
 
 test('readConfig does not read a whole number out of a setting that has more in it', () => {
   assert.deepEqual(
     readConfig({ lengthFrom: '3.5', lengthTo: '4 apples', PORT: '8080x' }),
-    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, port: 3000 },
+    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, accessLog: false, port: 3000 },
   );
   assert.equal(readConfig({ lengthTo: '-3' }).lengthTo, 2);
 });
@@ -828,10 +828,12 @@ test('readConfig falls back on a PORT that is not a port', () => {
 test('readConfig clamps lengths to 2..12 and reads brackets and negatives as flags', () => {
   assert.deepEqual(
     readConfig({ lengthFrom: '0', lengthTo: '400', brackets: 'true', negatives: 'false', PORT: '8080' }),
-    { lengthFrom: 2, lengthTo: 12, brackets: true, negatives: false, port: 8080 },
+    { lengthFrom: 2, lengthTo: 12, brackets: true, negatives: false, accessLog: false, port: 8080 },
   );
   assert.equal(readConfig({ brackets: 'false' }).brackets, false);
   assert.equal(readConfig({ negatives: 'true' }).negatives, true);
+  assert.equal(readConfig({ accessLog: 'true' }).accessLog, true);
+  assert.equal(readConfig({ accessLog: 'yes' }).accessLog, false);
 });
 
 test('brackets=never in the environment is the default for every request', async () => {
