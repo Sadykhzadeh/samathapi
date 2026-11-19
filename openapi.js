@@ -2,6 +2,8 @@
 // the server itself runs on, so it cannot say 2 to 12 where the code says
 // something else.
 export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, operatorNames, maxLeast, maxMost, answerLeast, answerLimit, answerSpan, config }) => {
+  const maxDefault = config.max ?? maxMost;
+
   const error = (description) => ({
     description,
     content: {
@@ -100,8 +102,8 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'max',
               in: 'query',
-              description: 'How far from zero any number may be: every number in the task and every step of working it out left to right. A small max is for a class that counts within 20 or 100. Without it, 10000. Without answerMin and answerMax the answers are then from 10 to 20, or from half of a max below 20 up to the max.',
-              schema: { type: 'integer', minimum: maxLeast, maximum: maxMost },
+              description: `How far from zero any number may be: every number in the task and every step of working it out left to right. A small max is for a class that counts within 20 or 100. Without it, ${maxDefault}. Without answerMin and answerMax the answers are then from 10 to 20, or from half of a max below 20 up to the max.`,
+              schema: { type: 'integer', minimum: maxLeast, maximum: maxMost, default: maxDefault },
             },
             {
               name: 'count',

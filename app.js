@@ -41,6 +41,12 @@ const toPort = (value) => {
   return parsed >= 1 && parsed <= 65535 ? parsed : 3000;
 };
 
+// Left unset, a task is kept to MAX_MOST, as samathgen keeps it when it is not told.
+const toMax = (value) => {
+  const parsed = wholeSetting(value);
+  return parsed >= MAX_LEAST && parsed <= MAX_MOST ? parsed : undefined;
+};
+
 export const readConfig = (env) => ({
   lengthFrom: toLength(env.lengthFrom, 2),
   lengthTo: toLength(env.lengthTo, 4),
@@ -48,6 +54,7 @@ export const readConfig = (env) => ({
   brackets: env.brackets === 'never' ? 'never' : flag(env.brackets),
   // On unless switched off, so only the exact string "false" counts as no.
   negatives: env.negatives !== 'false',
+  max: toMax(env.max),
   accessLog: flag(env.accessLog),
   port: toPort(env.PORT),
 });
@@ -306,7 +313,7 @@ const readRequest = (query, config) => {
     brackets: config.brackets,
     negatives: config.negatives,
     operators: undefined,
-    max: undefined,
+    max: config.max,
     count: undefined,
     seed: undefined,
     answers: undefined,
@@ -372,7 +379,8 @@ const readRequest = (query, config) => {
     else if (minOk && maxOk && max - min > ANSWER_SPAN) {
       errors.push(`answerMax must be at most ${ANSWER_SPAN} more than answerMin, ${max} is ${max - min} more than ${min}`);
     } else if (minOk && maxOk && request.max !== undefined && max > request.max) {
-      errors.push(`answerMax must not be more than max, ${max} is more than ${request.max}`);
+      const fromServer = query.max === undefined ? ', the server\'s default max' : '';
+      errors.push(`answerMax must not be more than max, ${max} is more than ${request.max}${fromServer}`);
     }
     if (errors.length === 0) request.answers = { min, max };
   }

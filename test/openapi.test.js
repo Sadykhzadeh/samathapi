@@ -109,6 +109,7 @@ test('the defaults it states are the settings the server runs on', () => {
   const parameters = Object.fromEntries(spec.paths['/gen'].get.parameters.map((p) => [p.name, p]));
   assert.equal(parameters.brackets.schema.default, 'true');
   assert.equal(parameters.negatives.schema.default, false);
+  assert.equal(parameters.max.schema.default, MAX_MOST);
   assert.match(parameters.length.description, /from 3 to 5/);
 });
 

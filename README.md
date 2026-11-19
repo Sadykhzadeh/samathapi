@@ -100,7 +100,7 @@ is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
 | `brackets` | `true`, `false` or `never` | the `brackets` setting, `true`, `false` or `never` |
 | `negatives` | `true` or `false` | the `negatives` setting |
 | `operators` | some of `add`, `subtract`, `multiply` and `divide`, separated by commas, each once | all four |
-| `max` | how far from zero any number may be, a whole number from `10` to `10000` | `10000` |
+| `max` | how far from zero any number may be, a whole number from `10` to `10000` | the `max` setting, or `10000` |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
 | `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `0` to `10000` with at most `100` between them; both or neither | `10` and `20` |
@@ -312,5 +312,6 @@ longer than a client will read.
 | `lengthTo` | `4` | Most terms in a generated task |
 | `brackets` | `false` | Set to `true` to wrap part of the task in brackets, or to `never` to leave out every group, for a class that has not met them; a request's own `brackets` still decides |
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
+| `max` | unset | A `max` for every request that does not ask for one, a whole number from `10` to `10000`, for a class that counts within 20 or 100 with a client that cannot send it, such as SaMathCLI; a request's own `max` still decides |
 | `accessLog` | `false` | Set to `true` to print one line to stdout per answer: method, path without its query string, status and time taken, such as `GET /gen 200 0.4 ms` |
 
