@@ -1,5 +1,10 @@
-import 'dotenv/config';
+import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
 import { createApp, readConfig, unbuildableLength } from './app.js';
+
+// The .env beside this file rather than the one in the working directory, so a
+// service manager that starts the server from elsewhere reads the same settings.
+loadEnv({ path: fileURLToPath(new URL('./.env', import.meta.url)), quiet: true });
 
 const config = readConfig(process.env);
 const problem = unbuildableLength(config);

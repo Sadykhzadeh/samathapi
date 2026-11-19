@@ -305,13 +305,13 @@ that a fault in the generator would not reach a client.
 
 ## Configuration
 
-Read from the environment, or from a `.env` file. Any value that is not a
-whole number falls back to its default, as does a `PORT` outside 1..65535,
-and lengths are clamped to 2..12 so a stray setting cannot produce a task
-longer than a client will read. When the generator cannot build a task of some
-length from `lengthFrom` to `lengthTo` with the other settings, the server does
-not start: it prints the reason and exits with code 1, since a request without
-a `length` would be refused.
+Read from the environment, or from a `.env` file beside `index.js`. Any value
+that is not a whole number falls back to its default, as does a `PORT` outside
+1..65535, and lengths are clamped to 2..12 so a stray setting cannot produce a
+task longer than a client will read. When the generator cannot build a task of
+some length from `lengthFrom` to `lengthTo` with the other settings, the server
+does not start: it prints the reason and exits with code 1, since a request
+without a `length` would be refused.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |

@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { once } from 'node:events';
+import { copyFile, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import net from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -23,9 +26,9 @@ const sigtermOnMessage = 'data:text/javascript,process.on("message",()=>process.
 
 // `node .` the way `npm start` runs it, with `env` on top of ours. Resolves
 // once it has printed its address, or with whatever it said if it exited.
-const start = (env) => {
-  const child = spawn(process.execPath, ['--import', sigtermOnMessage, '.'], {
-    cwd: root,
+const start = (env, { entry = '.', cwd = root } = {}) => {
+  const child = spawn(process.execPath, ['--import', sigtermOnMessage, entry], {
+    cwd,
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   });
@@ -55,6 +58,28 @@ test('the server listens on PORT and reads its settings from the environment', a
   } finally {
     server.child.kill();
     await server.exited;
+  }
+});
+
+test('the .env beside the server is read whatever the working directory', async () => {
+  const port = await freePort();
+  const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
+  try {
+    for (const file of ['index.js', 'app.js', 'cache.js', 'evaluate.js', 'openapi.js', 'package.json']) {
+      await copyFile(join(root, file), join(dir, file));
+    }
+    await symlink(join(root, 'node_modules'), join(dir, 'node_modules'), 'junction');
+    await writeFile(join(dir, '.env'), `PORT=${port}\n`);
+    const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
+    try {
+      await server.listening;
+      assert.equal(server.output.stdout.trim(), `http://localhost:${port}`);
+    } finally {
+      server.child.send('stop');
+      assert.equal(await server.exited, 0);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 
