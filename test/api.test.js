@@ -913,9 +913,13 @@ test('a response says how long it is and does not name the framework', async () 
   assert.equal(res.headers.get('x-powered-by'), null);
 });
 
-test('a name sent twice is not read as either value', async () => {
-  const res = await fetch(`${base}/gen?c=true&c=false`);
-  assert.match(res.headers.get('content-type'), /^application\/json/);
+test('a name sent twice is refused rather than read as either value', async () => {
+  for (const query of ['c=true&c=false', 'c=true&c=true']) {
+    const res = await fetch(`${base}/gen?${query}`);
+    assert.equal(res.status, 400, query);
+    assert.match(res.headers.get('content-type'), /^application\/json/, query);
+    assert.deepEqual(await res.json(), { error: 'c was sent 2 times, send it once' }, query);
+  }
 });
 
 // A config that reads fine while the app is built and throws on the first

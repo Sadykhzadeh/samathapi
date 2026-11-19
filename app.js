@@ -312,6 +312,7 @@ const readRequest = (query, config) => {
     answers: undefined,
   };
   const errors = Object.keys(query).map(misspelt).filter(Boolean);
+  if (Array.isArray(query.c)) errors.push(`c was sent ${query.c.length} times, send it once`);
   if (length !== undefined) {
     const parsed = wholeNumber(length);
     if (parsed >= LENGTH_MIN && parsed <= LENGTH_MAX) request.length = parsed;
