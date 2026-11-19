@@ -1,7 +1,12 @@
 import 'dotenv/config';
-import { createApp, readConfig } from './app.js';
+import { createApp, readConfig, unbuildableLength } from './app.js';
 
 const config = readConfig(process.env);
+const problem = unbuildableLength(config);
+if (problem) {
+  console.error(`${problem}, so lengthFrom and lengthTo must be lengths it can build`);
+  process.exit(1);
+}
 
 const server = createApp(config).listen(config.port, () => {
   console.log(`http://localhost:${config.port}`)

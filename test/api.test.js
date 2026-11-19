@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import net from 'node:net';
 import { mathGen } from 'samathgen';
-import { COUNT_MAX, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, drawOptions, drawSound, readConfig } from '../app.js';
+import { COUNT_MAX, MAX_LEAST, MAX_MOST, SEED_MAX, createApp, drawOptions, drawSound, readConfig, unbuildableLength } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>", which SaMathCLI splits on
@@ -593,6 +593,27 @@ test('an answer range in the environment that the other settings cannot build is
     }
     const own = await fetch(`${app.base}/gen?answerMin=0&answerMax=0`);
     assert.equal(own.status, 400);
+  } finally {
+    app.server.close();
+  }
+});
+
+test('every length in the configured range can be built with the default settings', () => {
+  assert.equal(unbuildableLength(readConfig({})), undefined);
+  assert.equal(unbuildableLength(readConfig({ operators: 'divide', brackets: 'never', lengthFrom: '2', lengthTo: '6' })), undefined);
+});
+
+test('the first configured length the settings cannot build is named', () => {
+  assert.match(unbuildableLength(readConfig({ operators: 'divide', brackets: 'never', lengthFrom: '10', lengthTo: '12' })), /^no task of 10 terms /);
+});
+
+test('an answer range from the environment that cannot be built is left out, so it is not named', async () => {
+  const env = { answerMin: '0', answerMax: '0', operators: 'multiply' };
+  assert.equal(unbuildableLength(readConfig(env)), undefined);
+  const app = await listen(createApp(readConfig(env)));
+  try {
+    const tasks = await (await fetch(`${app.base}/gen?count=20&seed=3`)).json();
+    for (const { answer } of tasks) assert.ok(answer >= 10 && answer <= 20, String(answer));
   } finally {
     app.server.close();
   }

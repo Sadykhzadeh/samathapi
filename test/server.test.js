@@ -72,6 +72,14 @@ test('a port that is already taken is one clear line and exit code 1', async () 
   }
 });
 
+test('a length the settings cannot build stops the server before it listens, with the reason', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), operators: 'divide', brackets: 'never', lengthFrom: '10', lengthTo: '12' });
+  assert.equal(await server.exited, 1);
+  assert.match(server.output.stderr.trim(), /^no task of 10 terms .*, so lengthFrom and lengthTo must be lengths it can build$/);
+  assert.equal(server.output.stdout, '');
+});
+
 test('SIGTERM stops the server with exit code 0 even with a connection left open', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port) });

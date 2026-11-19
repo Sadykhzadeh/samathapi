@@ -615,26 +615,63 @@ const matches = (header, etag) => header !== undefined
     return named === '*' || named === etag;
   });
 
+// The generator refuses some draws at random, so a length is drawn this many
+// times, and it is taken to be one the generator cannot build only when none
+// of them is built.
+const CHECK_DRAWS = 500;
+
+const lengthsOf = ({ lengthFrom, lengthTo }) => {
+  const lengths = [];
+  for (let length = Math.min(lengthFrom, lengthTo); length <= Math.max(lengthFrom, lengthTo); length++) lengths.push(length);
+  return lengths;
+};
+
+// The options a request that names none of its own is drawn with.
+const optionsOf = (config) => {
+  const options = { brackets: config.brackets, negatives: config.negatives };
+  if (config.answers) options.answer = [config.answers.min, config.answers.max];
+  if (config.operators) options.operators = symbolsOf(config.operators);
+  if (config.max !== undefined) options.max = config.max;
+  return options;
+};
+
+// The reason the generator gives for the first of `lengths` that none of
+// CHECK_DRAWS draws with `options` is built, or undefined when each can be.
+const unbuildable = (generate, lengths, options) => {
+  const generator = refusing(generate);
+  for (const length of lengths) {
+    let reason;
+    let drawn = false;
+    for (let draw = 0; draw < CHECK_DRAWS && !drawn; draw++) {
+      try {
+        if (drawSound(generator, length, options) === null) return `no task of ${length} terms can be drawn with these settings`;
+        drawn = true;
+      } catch (error) {
+        if (!(error instanceof Refused)) throw error;
+        reason = error.message;
+      }
+    }
+    if (!drawn) return reason;
+  }
+  return undefined;
+};
+
 // An answer range from the environment is served only when the generator can
 // build a task in it, with the other settings of the server, at every length a
 // request without a length can draw. One it cannot build is left out, as an
 // unusable setting is, rather than making every such request a 400.
 const usableAnswers = (config, generate) => {
   if (config.answers === undefined) return config;
-  const options = { brackets: config.brackets, negatives: config.negatives, answer: [config.answers.min, config.answers.max] };
-  if (config.operators) options.operators = symbolsOf(config.operators);
-  if (config.max !== undefined) options.max = config.max;
-  const generator = refusing(generate);
-  for (let length = Math.min(config.lengthFrom, config.lengthTo); length <= Math.max(config.lengthFrom, config.lengthTo); length++) {
-    let built;
-    try {
-      built = drawSound(generator, length, options);
-    } catch (error) {
-      if (!(error instanceof Refused)) throw error;
-    }
-    if (!built) return { ...config, answers: undefined };
-  }
-  return config;
+  return unbuildable(generate, lengthsOf(config), optionsOf(config)) ? { ...config, answers: undefined } : config;
+};
+
+// A request without a length draws one from lengthFrom to lengthTo, so a length
+// in that range the generator cannot build with the other settings would make
+// such requests a 400 or a 500. Returns the reason for the first one that it
+// cannot build, or undefined when every length can be built.
+export const unbuildableLength = (config, generate = mathGen) => {
+  const usable = usableAnswers(config, generate);
+  return unbuildable(generate, lengthsOf(usable), optionsOf(usable));
 };
 
 // `generate` is mathGen unless a test hands in something else. What comes
