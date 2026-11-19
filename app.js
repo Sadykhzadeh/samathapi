@@ -47,6 +47,17 @@ const toMax = (value) => {
   return parsed >= MAX_LEAST && parsed <= MAX_MOST ? parsed : undefined;
 };
 
+// The operators a configured default names, in the generator's order. A name
+// that is unknown or given twice makes the setting unusable, and every
+// operator stays allowed.
+const toOperators = (value) => {
+  const names = typeof value === 'string' ? value.split(',') : [];
+  const usable = names.length > 0
+    && names.every((name) => Object.hasOwn(OPERATOR_NAMES, name))
+    && new Set(names).size === names.length;
+  return usable ? Object.keys(OPERATOR_NAMES).filter((name) => names.includes(name)) : undefined;
+};
+
 export const readConfig = (env) => ({
   lengthFrom: toLength(env.lengthFrom, 2),
   lengthTo: toLength(env.lengthTo, 4),
@@ -55,6 +66,7 @@ export const readConfig = (env) => ({
   // On unless switched off, so only the exact string "false" counts as no.
   negatives: env.negatives !== 'false',
   max: toMax(env.max),
+  operators: toOperators(env.operators),
   accessLog: flag(env.accessLog),
   port: toPort(env.PORT),
 });
@@ -225,6 +237,8 @@ export const ANSWER_SPAN = 100;
 // string and * and / are a trouble to type. The generator takes the symbols.
 export const OPERATOR_NAMES = { add: '+', subtract: '-', multiply: '*', divide: '/' };
 
+const symbolsOf = (names) => Object.entries(OPERATOR_NAMES).filter(([name]) => names.includes(name)).map(([, symbol]) => symbol);
+
 // How far from zero a request may let any number go, in the task and on the
 // way to its answer. samathgen takes 10 to 10000 and uses 10000 when it is
 // not told.
@@ -312,7 +326,7 @@ const readRequest = (query, config) => {
     length: undefined,
     brackets: config.brackets,
     negatives: config.negatives,
-    operators: undefined,
+    operators: config.operators && symbolsOf(config.operators),
     max: config.max,
     count: undefined,
     seed: undefined,
@@ -346,7 +360,7 @@ const readRequest = (query, config) => {
     } else {
       // In the generator's order, so that the same operators in another order
       // are the same request.
-      request.operators = Object.entries(OPERATOR_NAMES).filter(([name]) => names.includes(name)).map(([, symbol]) => symbol);
+      request.operators = symbolsOf(names);
     }
   }
   if (max !== undefined) {

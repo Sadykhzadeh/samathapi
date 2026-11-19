@@ -522,6 +522,26 @@ test('max in the environment is the default for every request, and a request can
   }
 });
 
+test('operators in the environment are the default for every request, and a request can name its own', async () => {
+  const app = await listen(createApp(readConfig({ operators: 'add,subtract' })));
+  try {
+    const plain = await (await fetch(`${app.base}/gen?count=50&seed=3`)).json();
+    for (const { task } of plain) assert.ok(!task.some((piece) => piece === '*' || piece === '/'), task.join(''));
+    const times = await (await fetch(`${app.base}/gen?count=50&seed=3&operators=multiply`)).json();
+    for (const { task } of times) assert.ok(!task.some((piece) => piece === '+' || piece === '-'), task.join(''));
+  } finally {
+    app.server.close();
+  }
+});
+
+test('operators from the environment are read only when they are known names, each once', () => {
+  assert.deepEqual(readConfig({ operators: 'divide,add' }).operators, ['add', 'divide']);
+  assert.deepEqual(readConfig({ operators: 'multiply' }).operators, ['multiply']);
+  for (const operators of ['', 'add,modulo', 'add,add', '+,-', 'Add']) {
+    assert.equal(readConfig({ operators }).operators, undefined, operators);
+  }
+});
+
 test('an answerMax over the default max says so when the request did not send a max', async () => {
   const app = await listen(createApp(readConfig({ max: '20' })));
   try {
@@ -836,17 +856,17 @@ test('a seed it cannot honour is a 400 that says why', async () => {
 });
 
 test('readConfig falls back on anything that is not a whole number', () => {
-  assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, max: undefined, accessLog: false, port: 3000 });
+  assert.deepEqual(readConfig({}), { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, max: undefined, operators: undefined, accessLog: false, port: 3000 });
   assert.deepEqual(
     readConfig({ lengthFrom: 'abc', lengthTo: '', brackets: 'yes', negatives: 'no', PORT: 'x' }),
-    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, max: undefined, accessLog: false, port: 3000 },
+    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, max: undefined, operators: undefined, accessLog: false, port: 3000 },
   );
 });
 
 test('readConfig does not read a whole number out of a setting that has more in it', () => {
   assert.deepEqual(
     readConfig({ lengthFrom: '3.5', lengthTo: '4 apples', PORT: '8080x' }),
-    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, max: undefined, accessLog: false, port: 3000 },
+    { lengthFrom: 2, lengthTo: 4, brackets: false, negatives: true, max: undefined, operators: undefined, accessLog: false, port: 3000 },
   );
   assert.equal(readConfig({ lengthTo: '-3' }).lengthTo, 2);
 });
@@ -862,7 +882,7 @@ test('readConfig falls back on a PORT that is not a port', () => {
 test('readConfig clamps lengths to 2..12 and reads brackets and negatives as flags', () => {
   assert.deepEqual(
     readConfig({ lengthFrom: '0', lengthTo: '400', brackets: 'true', negatives: 'false', PORT: '8080' }),
-    { lengthFrom: 2, lengthTo: 12, brackets: true, negatives: false, max: undefined, accessLog: false, port: 8080 },
+    { lengthFrom: 2, lengthTo: 12, brackets: true, negatives: false, max: undefined, operators: undefined, accessLog: false, port: 8080 },
   );
   assert.equal(readConfig({ brackets: 'false' }).brackets, false);
   assert.equal(readConfig({ negatives: 'true' }).negatives, true);

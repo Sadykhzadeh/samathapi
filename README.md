@@ -313,5 +313,6 @@ longer than a client will read.
 | `brackets` | `false` | Set to `true` to wrap part of the task in brackets, or to `never` to leave out every group, for a class that has not met them; a request's own `brackets` still decides |
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
 | `max` | unset | A `max` for every request that does not ask for one, a whole number from `10` to `10000`, for a class that counts within 20 or 100 with a client that cannot send it, such as SaMathCLI; a request's own `max` still decides |
+| `operators` | all four | Names of the operators every request uses unless it names its own, separated by commas, such as `add,subtract` for a class that has not met the others |
 | `accessLog` | `false` | Set to `true` to print one line to stdout per answer: method, path without its query string, status and time taken, such as `GET /gen 200 0.4 ms` |
 
