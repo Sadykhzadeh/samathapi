@@ -3,6 +3,9 @@
 // something else.
 export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, operatorNames, maxLeast, maxMost, answerLeast, answerLimit, answerSpan, config }) => {
   const maxDefault = config.max ?? maxMost;
+  const answersDefault = config.answers
+    ? `the answers are from ${config.answers.min} to ${config.answers.max}, as the server is set up`
+    : 'the answers are from 10 to 20, or from half of a max below 20 up to the max';
   const operatorsDefault = config.operators ?? operatorNames;
 
   const error = (description) => ({
@@ -103,7 +106,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'max',
               in: 'query',
-              description: `How far from zero any number may be: every number in the task and every step of working it out left to right. A small max is for a class that counts within 20 or 100. Without it, ${maxDefault}. Without answerMin and answerMax the answers are then from 10 to 20, or from half of a max below 20 up to the max.`,
+              description: `How far from zero any number may be: every number in the task and every step of working it out left to right. A small max is for a class that counts within 20 or 100. Without it, ${maxDefault}. Without answerMin and answerMax ${answersDefault}.`,
               schema: { type: 'integer', minimum: maxLeast, maximum: maxMost, default: maxDefault },
             },
             {
@@ -115,7 +118,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'answerMin',
               in: 'query',
-              description: `The least answer a task may have, with answerMax, which has to come with it, at most ${answerSpan} more. Without them the answers are from 10 to 20, or from half of a max below 20 up to the max. The four options stay inside the range.`,
+              description: `The least answer a task may have, with answerMax, which has to come with it, at most ${answerSpan} more. Without them ${answersDefault}. The four options stay inside the range.`,
               schema: { type: 'integer', minimum: answerLeast, maximum: answerLimit },
             },
             {

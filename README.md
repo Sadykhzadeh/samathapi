@@ -103,7 +103,7 @@ is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
 | `max` | how far from zero any number may be, a whole number from `10` to `10000` | the `max` setting, or `10000` |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
-| `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `0` to `10000` with at most `100` between them; both or neither | `10` and `20` |
+| `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `0` to `10000` with at most `100` between them; both or neither | the `answerMin` and `answerMax` settings, or `10` and `20`, or from half of a `max` below 20 up to it |
 
 ```sh
 curl 'http://localhost:3000/gen?length=6&brackets=true'
@@ -215,6 +215,9 @@ may not be wider than 100 numbers, which keeps the work of building those
 options small, and runs from 0 to 10000. It goes with `length`, `brackets`,
 `negatives`, `count` and `seed`; the range is part of what a seed names.
 
+A server whose clients cannot send a range can set one for every request that
+names none, with the `answerMin` and `answerMax` settings below.
+
 The range may start at 0, as `answerMin=0&answerMax=20` does for a class that
 counts within twenty, and then `6-6` is a task. A range of 0 alone, or a range
 that holds only answers the operators cannot make, is a `400` that says so:
@@ -314,6 +317,7 @@ longer than a client will read.
 | `lengthTo` | `4` | Most terms in a generated task |
 | `brackets` | `false` | Set to `true` to wrap part of the task in brackets, or to `never` to leave out every group, for a class that has not met them; a request's own `brackets` still decides |
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
+| `answerMin`, `answerMax` | unset | The answers for every request that names neither. Both are needed: one alone is ignored. Whole numbers from `0` to `10000` with at most `100` between them, for a class that counts within 100 with a client that cannot send them, such as SaMathCLI. The range is left out when it goes past `max`, or when the generator cannot build tasks in it with the other settings. A request whose `max` is below the top of the range is a `400` unless it names a range of its own; a request's own range still decides |
 | `max` | unset | A `max` for every request that does not ask for one, a whole number from `10` to `10000`, for a class that counts within 20 or 100 with a client that cannot send it, such as SaMathCLI; a request's own `max` still decides |
 | `operators` | all four | Names of the operators every request uses unless it names its own, separated by commas, such as `add,subtract` for a class that has not met the others |
 | `accessLog` | `false` | Set to `true` to print one line to stdout per answer: method, path without its query string, status and time taken, such as `GET /gen 200 0.4 ms` |

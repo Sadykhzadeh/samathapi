@@ -58,6 +58,17 @@ const toOperators = (value) => {
   return usable ? Object.keys(OPERATOR_NAMES).filter((name) => names.includes(name)) : undefined;
 };
 
+// The answer range for every request that names none. Both or neither, as a
+// request has them, and within the limits a request has; a range the max
+// rules out is left out.
+const toAnswers = (min, most, max) => {
+  const least = wholeSetting(min);
+  const top = wholeSetting(most);
+  const usable = least >= ANSWER_LEAST && least <= top && top <= ANSWER_LIMIT
+    && top - least <= ANSWER_SPAN && (max === undefined || top <= max);
+  return usable ? { min: least, max: top } : undefined;
+};
+
 export const readConfig = (env) => ({
   lengthFrom: toLength(env.lengthFrom, 2),
   lengthTo: toLength(env.lengthTo, 4),
@@ -66,6 +77,7 @@ export const readConfig = (env) => ({
   // On unless switched off, so only the exact string "false" counts as no.
   negatives: env.negatives !== 'false',
   max: toMax(env.max),
+  answers: toAnswers(env.answerMin, env.answerMax, toMax(env.max)),
   operators: toOperators(env.operators),
   accessLog: flag(env.accessLog),
   port: toPort(env.PORT),
@@ -397,6 +409,12 @@ const readRequest = (query, config) => {
       errors.push(`answerMax must not be more than max, ${max} is more than ${request.max}${fromServer}`);
     }
     if (errors.length === 0) request.answers = { min, max };
+  } else if (config.answers) {
+    if (request.max !== undefined && config.answers.max > request.max) {
+      errors.push(`answerMax must not be more than max, ${config.answers.max} is more than ${request.max}, the server's default answerMax`);
+    } else {
+      request.answers = config.answers;
+    }
   }
   return errors.length > 0 ? { error: errors.join('; ') } : request;
 };
@@ -590,9 +608,32 @@ const matches = (header, etag) => header !== undefined
     return named === '*' || named === etag;
   });
 
+// An answer range from the environment is served only when the generator can
+// build a task in it, with the other settings of the server, at every length a
+// request without a length can draw. One it cannot build is left out, as an
+// unusable setting is, rather than making every such request a 400.
+const usableAnswers = (config, generate) => {
+  if (config.answers === undefined) return config;
+  const options = { brackets: config.brackets, negatives: config.negatives, answer: [config.answers.min, config.answers.max] };
+  if (config.operators) options.operators = symbolsOf(config.operators);
+  if (config.max !== undefined) options.max = config.max;
+  const generator = refusing(generate);
+  for (let length = Math.min(config.lengthFrom, config.lengthTo); length <= Math.max(config.lengthFrom, config.lengthTo); length++) {
+    let built;
+    try {
+      built = drawSound(generator, length, options);
+    } catch (error) {
+      if (!(error instanceof Refused)) throw error;
+    }
+    if (!built) return { ...config, answers: undefined };
+  }
+  return config;
+};
+
 // `generate` is mathGen unless a test hands in something else. What comes
 // back is a plain http.Server, not yet listening.
 export const createApp = (config, generate = mathGen, timeouts = {}) => {
+  config = usableAnswers(config, generate);
   const cache = createCache(CACHE_BYTES, costOf);
   const spec = JSON.stringify(buildSpec({
     version,
