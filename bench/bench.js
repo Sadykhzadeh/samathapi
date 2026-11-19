@@ -114,6 +114,9 @@ child.on('exit', (code) => {
   process.exit(1);
 });
 
+// A run that fails part way must not leave the server it started running.
+process.on('exit', () => child.kill());
+
 // Cold start: from spawning the process to the first answered request.
 const agent = new http.Agent({ keepAlive: false });
 for (;;) {
