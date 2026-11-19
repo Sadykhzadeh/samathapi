@@ -249,3 +249,15 @@ test('a range that has not been asked for lately is not set up again for every p
   times.sort((a, b) => a - b);
   assert.ok(times[20] < 2, `median ${times[20].toFixed(2)} ms`);
 });
+
+test('a width that a range cycles back to is not set up again', () => {
+  const widths = Array.from({ length: ANSWER_SPAN + 1 }, (_, width) => width);
+  for (const width of widths) drawOptions(width, { min: 0, max: width });
+  const times = widths.map((width) => {
+    const began = performance.now();
+    drawOptions(width, { min: 0, max: width });
+    return performance.now() - began;
+  });
+  times.sort((a, b) => a - b);
+  assert.ok(times[50] < 1, `median ${times[50].toFixed(2)} ms`);
+});

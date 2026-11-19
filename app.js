@@ -153,15 +153,15 @@ const buildOptionSets = (width) => {
   return holding;
 };
 
-// Building a width's sets takes a few milliseconds for the widest, so they are
-// kept for the widths asked for lately. A request for a range that starts
-// somewhere new costs no building, since only its width is looked up: a flood
-// of distinct ranges used to build a set for each, about 2.7 ms apiece.
+// Building a width's sets takes a few milliseconds for the widest. A request
+// can ask for at most ANSWER_SPAN + 1 widths, so every width is kept once it
+// is built, and a range that starts somewhere new costs no building, since
+// only its width is looked up. With all 101 widths built the map holds about
+// 8 MB of heap, outside the 4 MB answer cache.
 const optionSetsByWidth = new Map();
 const optionSetsFor = (width) => {
   let sets = optionSetsByWidth.get(width);
   if (sets === undefined) {
-    if (optionSetsByWidth.size >= 64) optionSetsByWidth.delete(optionSetsByWidth.keys().next().value);
     sets = buildOptionSets(width);
     optionSetsByWidth.set(width, sets);
   }
