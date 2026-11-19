@@ -95,7 +95,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'operators',
               in: 'query',
-              description: `Which operators a task may use, separated by commas, for a class that has not met them all: add,subtract is for one that has not met multiplication. Without it ${config.operators ? config.operators.join(', ') : 'all four'}. Some combinations cannot be built, such as divide alone with brackets=never at 7 numbers or more, and are a 400.`,
+              description: `Which operators a task may use, separated by commas, for a class that has not met them all: add,subtract is for one that has not met multiplication. Without it ${config.operators ? config.operators.join(', ') : 'all four'}. Some combinations cannot be built, such as divide alone with brackets=never at 10 numbers or more, which is a 400, and at 8 or 9 numbers, where most requests get a 400.`,
               style: 'form',
               explode: false,
               schema: { type: 'array', minItems: 1, uniqueItems: true, items: { type: 'string', enum: operatorNames }, default: operatorsDefault },

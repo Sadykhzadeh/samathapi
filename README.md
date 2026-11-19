@@ -191,11 +191,13 @@ task can come to. Two numbers of `multiply` make 10, 12, 14, 15, 16, 18 or 20
 and no other, so there the options are still spread over 10 to 20 and a pupil
 who has noticed that 11 is never the answer can rule it out.
 
-A few combinations cannot be built, and are a `400` that says which. `divide`
-alone with `brackets=never` runs out of room from 7 numbers, and from 3 under
-`max=10`; `subtract` alone with `negatives=false` and `brackets=never` does
-from 7 numbers under `max=20`; and `add` alone cannot make 12 numbers within
-`max=10` without negatives, since each is at least 1.
+A few combinations cannot be built, and a request that gets no task is a `400`
+that says which. `divide` alone with `brackets=never` runs out of room at 8
+numbers, where about one request in four is built, and at 10 none is; from 3
+under `max=10` none is. `subtract` alone with `negatives=false` and
+`brackets=never` under `max=20` builds about half its tasks at 7 numbers and
+few at 8; and `add` alone cannot make 12 numbers within `max=10` without
+negatives, since each is at least 1.
 
 ### Answers in a range of your own
 
