@@ -550,6 +550,13 @@ const send = (res, status, type, body, headers) => {
   res.end(body);
 };
 
+// The path of a request target, without its query string. A proxy names the
+// target in full, as http://host/gen, and means the same path.
+const pathOf = (url) => {
+  const at = url.indexOf('?');
+  return (at === -1 ? url : url.slice(0, at)).replace(/^https?:\/\/[^/]*/i, '') || '/';
+};
+
 // One line per answer on stdout, for a log collector. The query string is left
 // out, since a parameter is not something a log should keep; a request that
 // ends before its answer is complete is logged as aborted.
@@ -558,7 +565,7 @@ const logAccess = (req, res) => {
   res.on('close', () => {
     const took = Number(process.hrtime.bigint() - began) / 1e6;
     const status = res.writableFinished ? res.statusCode : 'aborted';
-    console.log(`${req.method} ${req.url.split('?')[0]} ${status} ${took.toFixed(1)} ms`);
+    console.log(`${req.method} ${pathOf(req.url)} ${status} ${took.toFixed(1)} ms`);
   });
 };
 
@@ -750,9 +757,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
   }));
 
   const handle = (req, res) => {
-    const at = req.url.indexOf('?');
-    // A proxy names the target in full, as http://host/gen, and means the same path.
-    let path = (at === -1 ? req.url : req.url.slice(0, at)).replace(/^https?:\/\/[^/]*/i, '').toLowerCase() || '/';
+    let path = pathOf(req.url).toLowerCase();
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     const route = routes.get(path);
     if (!route) {

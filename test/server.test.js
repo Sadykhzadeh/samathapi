@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import { once } from 'node:events';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -122,6 +123,26 @@ test('accessLog=true prints a line per answer with the method, path, status and 
   assert.match(lines[1], /^GET \/nope 404 [0-9.]+ ms$/);
   assert.match(lines[2], /^HEAD \/healthz 200 [0-9.]+ ms$/);
   assert.ok(!server.output.stdout.includes('seed'), server.output.stdout);
+});
+
+test('accessLog names the path of a target sent as a full URL, not the URL', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), accessLog: 'true' });
+  try {
+    await server.listening;
+    await new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path: 'http://example.test/gen?c=true', headers: { host: 'example.test' } }, (res) => {
+        res.resume();
+        res.on('end', resolve);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  } finally {
+    server.child.send('stop');
+    assert.equal(await server.exited, 0);
+  }
+  assert.match(server.output.stdout, /^GET \/gen 200 [0-9.]+ ms$/m);
 });
 
 test('without accessLog the server prints nothing but its address', async () => {
