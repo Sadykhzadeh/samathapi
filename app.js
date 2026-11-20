@@ -615,9 +615,9 @@ const matches = (header, etag) => header !== undefined
     return named === '*' || named === etag;
   });
 
-// The generator refuses some draws at random, so a length is drawn this many
-// times, and it is taken to be one the generator cannot build only when none
-// of them is built.
+// The generator refuses some draws, so a length is drawn with each of this many
+// seeds, and it is taken to be one the generator cannot build only when none of
+// them is built. Seeded draws give the same answer on every start.
 const CHECK_DRAWS = 500;
 
 const lengthsOf = ({ lengthFrom, lengthTo }) => {
@@ -642,16 +642,15 @@ const unbuildable = (generate, lengths, options) => {
   for (const length of lengths) {
     let reason;
     let drawn = false;
-    for (let draw = 0; draw < CHECK_DRAWS && !drawn; draw++) {
+    for (let seed = 0; seed < CHECK_DRAWS && !drawn; seed++) {
       try {
-        if (drawSound(generator, length, options) === null) return `no task of ${length} terms can be drawn with these settings`;
-        drawn = true;
+        drawn = drawSound(generator, length, { ...options, seed }) !== null;
       } catch (error) {
         if (!(error instanceof Refused)) throw error;
         reason = error.message;
       }
     }
-    if (!drawn) return reason;
+    if (!drawn) return reason ?? `no task of ${length} terms can be drawn with these settings`;
   }
   return undefined;
 };
