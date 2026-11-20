@@ -136,6 +136,8 @@ child.on('exit', (code) => {
 
 // A run that fails part way must not leave the server it started running.
 process.on('exit', () => child.kill());
+// A signal ends the run without an exit event of its own, so it is turned into one.
+for (const signal of ['SIGHUP', 'SIGINT', 'SIGTERM']) process.on(signal, () => process.exit(1));
 
 // Cold start: from spawning the process to the first answered request.
 const agent = new http.Agent({ keepAlive: false });

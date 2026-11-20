@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { readdir, readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { setTimeout as wait } from 'node:timers/promises';
 
 const bench = fileURLToPath(new URL('../bench/bench.js', import.meta.url));
 const run = promisify(execFile);
@@ -35,4 +38,46 @@ test('the benchmark names an option it cannot use, with its usage', async () => 
 test('the benchmark prints its usage for --help', async () => {
   const { stdout } = await run(process.execPath, [bench, '--help']);
   assert.match(stdout, /^usage: node bench\/bench\.js \[--seconds n\]/);
+});
+
+const parentOf = async (pid) => {
+  for (const entry of await readdir('/proc')) {
+    if (!/^[0-9]+$/.test(entry)) continue;
+    const stat = await readFile(`/proc/${entry}/stat`, 'utf8').catch(() => '');
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    if (Number(fields[1]) === pid) return Number(entry);
+  }
+  return undefined;
+};
+
+const exited = async (pid) => {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const stat = await readFile(`/proc/${pid}/stat`, 'utf8').catch(() => undefined);
+    if (stat === undefined || stat.slice(stat.lastIndexOf(')') + 2).startsWith('Z')) return true;
+    await wait(50);
+  }
+  return false;
+};
+
+test('an interrupted benchmark stops the server it started', { skip: process.platform !== 'linux' && 'reads /proc' }, async () => {
+  const child = spawn(process.execPath, [bench, '--seconds', '60', '/healthz'], { stdio: 'ignore' });
+  let server;
+  try {
+    for (let attempt = 0; server === undefined && attempt < 100; attempt++) {
+      server = await parentOf(child.pid);
+      if (server === undefined) await wait(50);
+    }
+    assert.ok(server, 'the benchmark started no server');
+    child.kill('SIGTERM');
+    const [code] = await once(child, 'exit');
+    assert.equal(code, 1);
+    assert.ok(await exited(server), `server ${server} still running`);
+  } finally {
+    child.kill('SIGKILL');
+    if (server) {
+      try {
+        process.kill(server, 'SIGKILL');
+      } catch {}
+    }
+  }
 });
