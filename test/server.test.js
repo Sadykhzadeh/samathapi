@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import { once } from 'node:events';
-import { copyFile, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -61,14 +61,19 @@ test('the server listens on PORT and reads its settings from the environment', a
   }
 });
 
+// A copy of the server in `dir`, with the dependencies of this one.
+const copyServer = async (dir) => {
+  for (const file of ['index.js', 'app.js', 'cache.js', 'evaluate.js', 'openapi.js', 'package.json']) {
+    await copyFile(join(root, file), join(dir, file));
+  }
+  await symlink(join(root, 'node_modules'), join(dir, 'node_modules'), 'junction');
+};
+
 test('the .env beside the server is read whatever the working directory', async () => {
   const port = await freePort();
   const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
   try {
-    for (const file of ['index.js', 'app.js', 'cache.js', 'evaluate.js', 'openapi.js', 'package.json']) {
-      await copyFile(join(root, file), join(dir, file));
-    }
-    await symlink(join(root, 'node_modules'), join(dir, 'node_modules'), 'junction');
+    await copyServer(dir);
     await writeFile(join(dir, '.env'), `PORT=${port}\n`);
     const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
     try {
@@ -77,6 +82,24 @@ test('the .env beside the server is read whatever the working directory', async 
     } finally {
       server.child.send('stop');
       assert.equal(await server.exited, 0);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a .env beside the server that cannot be read stops the server rather than using the defaults', { timeout: 15000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
+  try {
+    await copyServer(dir);
+    await mkdir(join(dir, '.env'));
+    const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
+    try {
+      assert.equal(await server.exited, 1);
+      assert.match(server.output.stderr.trim(), /^EISDIR: .*, so the server does not start$/);
+      assert.equal(server.output.stdout, '');
+    } finally {
+      server.child.kill();
     }
   } finally {
     await rm(dir, { recursive: true, force: true });

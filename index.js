@@ -4,7 +4,13 @@ import { createApp, readConfig, unbuildableLength } from './app.js';
 
 // The .env beside this file rather than the one in the working directory, so a
 // service manager that starts the server from elsewhere reads the same settings.
-loadEnv({ path: fileURLToPath(new URL('./.env', import.meta.url)), quiet: true });
+const { error: envError } = loadEnv({ path: fileURLToPath(new URL('./.env', import.meta.url)), quiet: true });
+// A .env that is there but cannot be read would leave every setting at its
+// default without a word, so the server stops instead.
+if (envError && envError.code !== 'ENOENT') {
+  console.error(`${envError.message}, so the server does not start`);
+  process.exit(1);
+}
 
 // Output is for whoever reads it. A reader that has gone, or a disk that is
 // full, fails each write with an error nothing listens for, and that must not
