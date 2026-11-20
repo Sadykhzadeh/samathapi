@@ -619,6 +619,11 @@ test('an answer range from the environment that cannot be built is left out, so 
   }
 });
 
+test('an answer range from the environment needs both of its ends', () => {
+  assert.equal(readConfig({ answerMin: '50' }).answers, undefined);
+  assert.equal(readConfig({ answerMax: '50' }).answers, undefined);
+});
+
 test('the spec gives the range from the environment as the default', async () => {
   const app = await listen(createApp(readConfig({ answerMin: '50', answerMax: '100' })));
   try {
@@ -745,6 +750,17 @@ test('count with c=true is one CLI line per task', async () => {
   const lines = body.slice(0, -1).split('\n');
   assert.equal(lines.length, 25);
   for (const line of lines) assert.match(line, CLI_LINE);
+});
+
+test('a count of one is a list of one in either format', async () => {
+  const list = await (await fetch(`${base}/gen?count=1`)).json();
+  assert.ok(Array.isArray(list));
+  assert.equal(list.length, 1);
+  const text = await (await fetch(`${base}/gen?c=true&count=1`)).text();
+  assert.ok(text.endsWith('\n'));
+  const lines = text.slice(0, -1).split('\n');
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], CLI_LINE);
 });
 
 test('each task of a count draws its own length unless the request fixes one', async () => {
