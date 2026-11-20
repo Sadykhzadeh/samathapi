@@ -20,15 +20,35 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const probe = new URL('./probe.js', import.meta.url).href;
 
-const args = process.argv.slice(2);
-const option = (name, fallback) => {
-  const at = args.indexOf(`--${name}`);
-  return at === -1 ? fallback : Number(args.splice(at, 2)[1]);
+const usage = 'usage: node bench/bench.js [--seconds n] [--connections n] [--gzip] [path ...]';
+const fail = (message) => {
+  console.error(`${message}\n${usage}`);
+  process.exit(1);
 };
-const seconds = option('seconds', 3);
-const connections = option('connections', 16);
+
+const args = process.argv.slice(2);
+if (args.includes('--help')) {
+  console.log(usage);
+  process.exit(0);
+}
+
+const option = (name, fallback, valid, rule) => {
+  const at = args.indexOf(`--${name}`);
+  if (at === -1) return fallback;
+  const value = Number(args[at + 1]);
+  if (!valid(value)) {
+    const sent = args[at + 1] === undefined ? 'nothing' : JSON.stringify(args[at + 1]);
+    fail(`--${name} must be ${rule}, not ${sent}`);
+  }
+  args.splice(at, 2);
+  return value;
+};
+const seconds = option('seconds', 3, (n) => n > 0, 'a number above 0');
+const connections = option('connections', 16, (n) => Number.isInteger(n) && n > 0, 'a whole number above 0');
 const gzip = args.includes('--gzip');
 if (gzip) args.splice(args.indexOf('--gzip'), 1);
+const unknown = args.find((arg) => arg.startsWith('--'));
+if (unknown !== undefined) fail(`unknown option ${unknown}`);
 
 const scenarios = args.length > 0 ? args : [
   '/healthz',
