@@ -219,9 +219,10 @@ A server whose clients cannot send a range can set one for every request that
 names none, with the `answerMin` and `answerMax` settings below.
 
 The range may start at 0, as `answerMin=0&answerMax=20` does for a class that
-counts within twenty, and then `6-6` is a task. A range of 0 alone, or a range
-that holds only answers the operators cannot make, is a `400` that says so:
-`multiply` alone cannot make 0.
+counts within twenty, and then `6-6` is a task. A range that holds only answers
+the operators cannot make is a `400` that says so: `answerMin=0&answerMax=0`
+with `operators=multiply` is one, since `multiply` alone cannot make 0. With
+all four operators the same range gives tasks such as `11-11`.
 
 A range narrower than four answers has no four options inside it, so there they
 fall around the answer, and still stay at 0 or above with `negatives=false` and
