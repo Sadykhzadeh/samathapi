@@ -190,3 +190,19 @@ test('without accessLog the server prints nothing but its address', async () => 
   }
   assert.equal(server.output.stdout.trim(), `http://localhost:${port}\nSIGTERM received, finishing open requests`);
 });
+
+test('a reader that closes stdout does not stop the server answering', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), accessLog: 'true' });
+  try {
+    await server.listening;
+    server.child.stdout.destroy();
+    for (let i = 0; i < 3; i++) {
+      assert.equal((await fetch(`http://127.0.0.1:${port}/healthz`)).status, 200);
+    }
+    assert.equal(server.child.exitCode, null);
+  } finally {
+    server.child.kill();
+    await server.exited;
+  }
+});

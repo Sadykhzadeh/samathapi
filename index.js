@@ -6,6 +6,11 @@ import { createApp, readConfig, unbuildableLength } from './app.js';
 // service manager that starts the server from elsewhere reads the same settings.
 loadEnv({ path: fileURLToPath(new URL('./.env', import.meta.url)), quiet: true });
 
+// Output is for whoever reads it. A reader that has gone, or a disk that is
+// full, fails each write with an error nothing listens for, and that must not
+// stop the server answering.
+for (const stream of [process.stdout, process.stderr]) stream.on('error', () => {});
+
 const config = readConfig(process.env);
 const problem = unbuildableLength(config);
 if (problem) {
