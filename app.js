@@ -837,6 +837,23 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     res.on('finish', () => socket.end());
     send(res, 405, JSON_TYPE, '{"error":"method not allowed"}', { Allow: ALLOWED, Connection: 'close' });
   });
+  // A request the parser refuses, a head over 16 KB, one that is not HTTP or one
+  // that runs past a timeout, gets the JSON error the other refusals get, with
+  // the CORS header, so a page on another origin can read why. Node would
+  // otherwise send a bare status line. A socket that has already carried an
+  // answer, such as a request whose body stalls after its 405, gets no second one.
+  server.on('clientError', (error, socket) => {
+    socket.on('error', () => socket.destroy());
+    if (!socket.writable || socket.bytesWritten > 0) {
+      socket.destroy();
+      return;
+    }
+    const status = { HPE_HEADER_OVERFLOW: 431, ERR_HTTP_REQUEST_TIMEOUT: 408 }[error.code] ?? 400;
+    const res = new http.ServerResponse({ method: 'GET', httpVersionMajor: 1, httpVersionMinor: 1 });
+    res.assignSocket(socket);
+    res.on('finish', () => socket.end());
+    send(res, status, JSON_TYPE, JSON.stringify({ error: http.STATUS_CODES[status].toLowerCase() }), { Connection: 'close' });
+  });
   server.requestTimeout = timeouts.request ?? REQUEST_TIMEOUT_MS;
   server.headersTimeout = timeouts.headers ?? HEADERS_TIMEOUT_MS;
   server.keepAliveTimeout = timeouts.keepAlive ?? KEEP_ALIVE_TIMEOUT_MS;

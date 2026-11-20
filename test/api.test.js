@@ -1258,10 +1258,64 @@ test('the answer to /gen says it varies with Accept and Accept-Encoding', async 
 });
 
 test('a query string past the header limit is refused, and the server goes on answering', async () => {
-  const res = await fetch(`${base}/gen?x=${'a'.repeat(20_000)}`);
-  assert.equal(res.status, 431);
-  await res.arrayBuffer();
+  const [head] = (await exchange(server.address().port, `GET /gen?x=${'a'.repeat(20_000)} HTTP/1.1\r\nHost: x\r\n\r\n`)).split('\r\n\r\n');
+  assert.match(head, /^HTTP\/1\.1 431 /);
   assert.equal((await fetch(`${base}/healthz`)).status, 200);
+});
+
+// Sends `payload` as it is, and returns everything the server answers before it closes.
+const exchange = async (port, payload) => {
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.setEncoding('utf8');
+  socket.end(payload);
+  let answer = '';
+  for await (const chunk of socket) answer += chunk;
+  return answer;
+};
+
+test('a request the parser refuses is answered in JSON with the CORS header, as other errors are', async () => {
+  const cases = [
+    [`GET /gen?x=${'a'.repeat(20_000)} HTTP/1.1\r\nHost: x\r\n\r\n`, 431, 'request header fields too large'],
+    ['NOT HTTP AT ALL\r\n\r\n', 400, 'bad request'],
+  ];
+  for (const [payload, status, error] of cases) {
+    const [head, body] = (await exchange(server.address().port, payload)).split('\r\n\r\n');
+    assert.match(head, new RegExp(`^HTTP/1\\.1 ${status} `));
+    assert.match(head, /^Access-Control-Allow-Origin: \*$/m);
+    assert.match(head, /^Content-Type: application\/json; charset=utf-8$/m);
+    assert.deepEqual(JSON.parse(body), { error });
+  }
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
+});
+
+test('a request that stalls past the headers timeout is answered 408 in JSON, then closed', { timeout: 15000 }, async () => {
+  const app = createApp(readConfig({}), undefined, { headers: 300, request: 5000, keepAlive: 1000, check: 50 });
+  const { server: slow } = await listen(app);
+  const socket = net.connect(slow.address().port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.setEncoding('utf8');
+  socket.write('GET /gen?seed=1 HTT');
+  let answer = '';
+  for await (const chunk of socket) answer += chunk;
+  slow.close();
+  const [head, body] = answer.split('\r\n\r\n');
+  assert.match(head, /^HTTP\/1\.1 408 /);
+  assert.deepEqual(JSON.parse(body), { error: 'request timeout' });
+});
+
+test('a request whose body stalls on a kept-alive connection is closed without a second answer', { timeout: 15000 }, async () => {
+  const app = createApp(readConfig({}), undefined, { headers: 300, request: 300, keepAlive: 1000, check: 50 });
+  const { server: slow } = await listen(app);
+  const socket = net.connect(slow.address().port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.setEncoding('utf8');
+  socket.write('GET /healthz HTTP/1.1\r\nHost: x\r\n\r\nPOST /gen HTTP/1.1\r\nHost: x\r\nContent-Length: 10\r\n\r\n');
+  let answer = '';
+  socket.on('data', (chunk) => { answer += chunk; });
+  await once(socket, 'close');
+  slow.close();
+  assert.deepEqual(answer.match(/HTTP\/1\.1 \d{3}/g), ['HTTP/1.1 200', 'HTTP/1.1 405']);
 });
 
 test('a client that stalls mid-request-line is dropped at the headers timeout, and others are still served', { timeout: 15000 }, async () => {
