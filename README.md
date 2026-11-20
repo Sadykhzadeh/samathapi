@@ -197,7 +197,11 @@ numbers, where about one request in four is built, and at 10 none is; from 3
 under `max=10` none is. `subtract` alone with `negatives=false` and
 `brackets=never` under `max=20` builds about half its tasks at 7 numbers and
 few at 8; and `add` alone cannot make 12 numbers within `max=10` without
-negatives, since each is at least 1.
+negatives, since each is at least 1. Nor can it make an answer below its number of
+numbers, so never 0, for the same reason: `answerMin=0&answerMax=0` with
+`operators=add&negatives=false` is a `400` that names negative numbers, and
+that is the setting to change, since the same range builds `(-15)+15` with
+them.
 
 ### Answers in a range of your own
 
