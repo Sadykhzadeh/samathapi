@@ -318,7 +318,7 @@ without a `length` would be refused.
 | --- | --- | --- |
 | `PORT` | `3000` | Port to listen on |
 | `lengthFrom` | `2` | Fewest terms in a generated task |
-| `lengthTo` | `4` | Most terms in a generated task |
+| `lengthTo` | `4` | Most terms in a generated task. A `lengthFrom` above it is read the other way round, so `lengthFrom=5` with `lengthTo=3` draws from 3 to 5 |
 | `brackets` | `false` | Set to `true` to wrap part of the task in brackets, or to `never` to leave out every group, for a class that has not met them; a request's own `brackets` still decides |
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
 | `answerMin`, `answerMax` | unset | The answers for every request that names neither. Both are needed: one alone is ignored. Whole numbers from `0` to `10000` with at most `100` between them, for a class that counts within 100 with a client that cannot send them, such as SaMathCLI. The range is left out when it goes past `max`, or when the generator cannot build tasks in it with the other settings. A request whose `max` is below the top of the range is a `400` unless it names a range of its own; a request's own range still decides |
