@@ -252,6 +252,9 @@ Without a `length`, every task draws its own from the configured range. The
 list shape follows the parameter and not the number: `count=1` is a list of
 one.
 
+Without a `count`, the `c=true` line has no newline after it, so a `while read`
+loop over it skips the line. `count=1` gives one line with its newline.
+
 No task comes twice in one list: a task the list already holds is drawn
 again. Short tasks are few, about 1 200 with two numbers, so without that a
 third of 20-question quizzes of them would ask one twice. A request draws again for
