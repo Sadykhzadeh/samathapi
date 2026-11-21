@@ -174,6 +174,23 @@ test('SIGINT stops the server with exit code 0 even with a connection left open,
   socket.destroy();
 });
 
+test('a connection still open 10 seconds after the stop is cut, with exit code 1', { timeout: 30_000 }, async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port) });
+  await server.listening;
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.write('GET /gen?seed=1 HTT');
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const began = performance.now();
+  server.child.send('stop');
+  assert.equal(await server.exited, 1);
+  const waited = performance.now() - began;
+  assert.ok(waited >= 9500 && waited < 12000, `${waited} ms`);
+  assert.match(server.output.stderr, /still open after 10 s, closing/);
+  socket.destroy();
+});
+
 test('accessLog=true prints a line per answer with the method, path, status and time, and no query string', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port), accessLog: 'true' });
