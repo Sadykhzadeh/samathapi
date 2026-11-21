@@ -106,3 +106,25 @@ test('an interrupted benchmark stops the server it started', { skip: process.pla
     }
   }
 });
+
+test('a server that stops answering part way ends the benchmark with its error and exit code 1', { skip: process.platform !== 'linux' && 'reads /proc', timeout: 60_000 }, async () => {
+  const child = spawn(process.execPath, [bench, '--seconds', '60', '/healthz'], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let stderr = '';
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  let server;
+  try {
+    for (let attempt = 0; server === undefined && attempt < 100; attempt++) {
+      server = await parentOf(child.pid);
+      if (server === undefined) await wait(50);
+    }
+    assert.ok(server, 'the benchmark started no server');
+    await wait(1000);
+    process.kill(server, 'SIGKILL');
+    const [code] = await once(child, 'exit');
+    assert.equal(code, 1);
+    assert.match(stderr.trim(), /^the server (stopped answering: \S|exited with )/);
+    assert.doesNotMatch(stderr, /^\s+at /m);
+  } finally {
+    child.kill('SIGKILL');
+  }
+});

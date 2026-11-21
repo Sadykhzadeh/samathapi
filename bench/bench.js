@@ -153,19 +153,24 @@ const idleRss = await rssOf(child);
 
 // A path the server does not answer with 200 is refused rather than measured:
 // a 400 is quicker than a task, so its numbers would say nothing about a quiz.
-for (const path of scenarios) {
-  const answer = await fetch(`http://127.0.0.1:${port}${path}`);
-  const text = await answer.text();
-  if (answer.status !== 200) {
-    console.error(`${path} answered ${answer.status}, so it is not measured: ${text.trim()}`);
-    process.exit(1);
-  }
-}
-
+// A server that stops answering part way ends the run with its error, not a stack trace.
 const rows = [];
-for (const path of scenarios) {
-  await load(port, path).then(() => {}, () => {});
-  rows.push(await load(port, path));
+try {
+  for (const path of scenarios) {
+    const answer = await fetch(`http://127.0.0.1:${port}${path}`);
+    const text = await answer.text();
+    if (answer.status !== 200) {
+      console.error(`${path} answered ${answer.status}, so it is not measured: ${text.trim()}`);
+      process.exit(1);
+    }
+  }
+  for (const path of scenarios) {
+    await load(port, path).then(() => {}, () => {});
+    rows.push(await load(port, path));
+  }
+} catch (error) {
+  console.error(`the server stopped answering: ${error.message}`);
+  process.exit(1);
 }
 const loadedRss = await rssOf(child);
 
