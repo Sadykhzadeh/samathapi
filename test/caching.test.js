@@ -140,7 +140,7 @@ test('a flood of tiny seeded answers is not kept past the cache bytes, keys and 
     }
     const drawn = app.state.calls;
     await fetch(`${app.base}/gen?c=true&seed=1`);
-    assert.equal(app.state.calls, drawn + 1, 'seed 1 is still kept after 30 000 others');
+    assert.equal(app.state.calls, drawn + 1, 'seed 1 is drawn again after 30 000 others');
   } finally {
     app.server.close();
   }
