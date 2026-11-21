@@ -40,6 +40,16 @@ test('the benchmark prints its usage for --help', async () => {
   assert.match(stdout, /^usage: node bench\/bench\.js \[--seconds n\]/);
 });
 
+test('the benchmark reports its start, its memory and each path it is given, with no failed answer', { timeout: 60_000 }, async () => {
+  const { stdout } = await run(process.execPath, [bench, '--seconds', '0.2', '--connections', '2', '--gzip', '/healthz', '/gen?c=true']);
+  assert.match(stdout, /^node v\d+\.\d+\.\d+, 2 connections, gzip, 0\.2 s per path after a warm-up of the same length$/m);
+  assert.match(stdout, /^cold start to first response: \d+ ms$/m);
+  assert.match(stdout, /^memory: [\d.]+ MB at idle, [\d.]+ MB after the run$/m);
+  const rows = stdout.split('\n').filter((line) => line.includes("'/")).map((line) => line.split('│').map((cell) => cell.trim()).filter(Boolean));
+  assert.deepEqual(rows.map((cells) => cells[1]), ["'/healthz'", "'/gen?c=true'"]);
+  assert.deepEqual(rows.map((cells) => cells.at(-1)), ['0', '0']);
+});
+
 const parentOf = async (pid) => {
   for (const entry of await readdir('/proc')) {
     if (!/^[0-9]+$/.test(entry)) continue;
