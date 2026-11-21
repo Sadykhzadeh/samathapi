@@ -160,6 +160,20 @@ test('a second SIGTERM cuts the connection still open at once, with exit code 1'
   socket.destroy();
 });
 
+test('SIGINT stops the server with exit code 0 even with a connection left open, as SIGTERM does', { skip: process.platform === 'win32' && 'signals are not sent on Windows' }, async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port) });
+  await server.listening;
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.write('GET /healthz HTTP/1.1\r\nHost: x\r\n\r\n');
+  await once(socket, 'data');
+  server.child.kill('SIGINT');
+  assert.equal(await server.exited, 0);
+  assert.match(server.output.stdout, /SIGINT received/);
+  socket.destroy();
+});
+
 test('accessLog=true prints a line per answer with the method, path, status and time, and no query string', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port), accessLog: 'true' });
