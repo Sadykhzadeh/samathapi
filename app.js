@@ -507,7 +507,7 @@ const drawTask = (generate, request, config, seed) => {
 // tasks to give, as an answer of exactly 1 within two numbers has, and 100 of
 // them would draw again and again, so the redraws of a whole request are
 // limited too: past REDRAWS the rest may repeat.
-const REDRAWS = 500;
+export const REDRAWS = 500;
 
 const drawFresh = (generate, request, config, asked, budget) => {
   let result;

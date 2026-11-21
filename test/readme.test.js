@@ -1,7 +1,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createApp, readConfig } from '../app.js';
+import {
+  ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, CACHE_BYTES, COUNT_MAX, DEFAULT_RANGE, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST,
+  OPERATOR_NAMES, REDRAWS, SEED_MAX, createApp, readConfig,
+} from '../app.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>"
 const CLI_LINE = /^[-0-9()*/+]+ -?[0-9]+(,-?[0-9]+){3} -?[0-9]+$/;
@@ -69,4 +72,40 @@ test('the output shown under an unseeded example has the right shape', async () 
       assert.deepEqual(Object.keys(shown), Object.keys(sent), url);
     }
   }
+});
+
+const rowsOf = (name) => readme.split('\n').filter((line) => line.startsWith(`| \`${name}\``));
+
+test('the limits in the README tables are the ones the server enforces', () => {
+  const span = (from, to) => `\`${from}\` to \`${to}\``;
+  const limits = {
+    length: [span(LENGTH_MIN, LENGTH_MAX)],
+    count: [span(1, COUNT_MAX)],
+    max: [span(MAX_LEAST, MAX_MOST)],
+    seed: [span(0, SEED_MAX)],
+    answerMin: [span(ANSWER_LEAST, ANSWER_LIMIT), `\`${ANSWER_SPAN}\` between`],
+  };
+  for (const [name, phrases] of Object.entries(limits)) {
+    const rows = rowsOf(name);
+    assert.ok(rows.length > 0, name);
+    for (const row of rows) {
+      for (const phrase of phrases) assert.ok(row.includes(phrase), `${phrase} is not in ${row}`);
+    }
+  }
+  assert.ok(rowsOf('answerMin').some((row) => row.includes(`\`${DEFAULT_RANGE.min}\` and \`${DEFAULT_RANGE.max}\``)));
+});
+
+test('the defaults in the README settings table are the ones the server reads', () => {
+  const config = readConfig({});
+  const defaults = { PORT: config.port, lengthFrom: config.lengthFrom, lengthTo: config.lengthTo, brackets: config.brackets, negatives: config.negatives };
+  for (const [name, value] of Object.entries(defaults)) {
+    assert.ok(rowsOf(name).some((row) => row.split('|')[2].trim() === `\`${value}\``), `${name} is not ${value}`);
+  }
+});
+
+test('the operators and numbers the README states are the server\'s', () => {
+  const [row] = rowsOf('operators');
+  for (const name of Object.keys(OPERATOR_NAMES)) assert.ok(row.includes(`\`${name}\``), name);
+  assert.ok(readme.includes(`${REDRAWS} times in all`), 'the repeat limit');
+  assert.ok(readme.includes(`up to ${CACHE_BYTES / 2 ** 20} MB`), 'the cache size');
 });
