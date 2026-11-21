@@ -67,7 +67,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
           summary: 'Generate one task, or a whole quiz with count',
           description: [
             'Every task works out to its answer with whole numbers only, * and / before + and -.',
-            'Without c the format follows the Accept header: text/plain asks for the line SaMathCLI parses,',
+            'Without c the format follows the Accept header: text/plain with a higher q than JSON asks for the line SaMathCLI parses,',
             'anything else gets JSON. With a seed the answer is the same every time.',
           ].join(' '),
           parameters: [
