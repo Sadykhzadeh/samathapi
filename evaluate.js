@@ -62,3 +62,44 @@ export const evaluate = (text, { negatives = true } = {}) => {
   const value = sum();
   return at === text.length ? value : NaN;
 };
+
+// The task after each step of working it out, from the task as it was given to
+// the answer: the innermost brackets first, then * and / left to right, then +
+// and - left to right, which is the order evaluate() takes. A bracket that holds
+// one number once it is worked out is dropped with that step, and a negative
+// number that is not in brackets of its own gets them, as in 5+(-3).
+export const workingOf = (task) => {
+  const text = (tokens) => tokens.map((token, i) => (
+    typeof token === 'number' && token < 0 && i > 0 && tokens[i - 1] !== '(' ? `(${token})` : `${token}`
+  )).join('');
+
+  const steps = [task.join('')];
+  const tokens = [...task];
+  while (tokens.length > 1) {
+    const close = tokens.indexOf(')');
+    const open = close === -1 ? -1 : tokens.lastIndexOf('(', close);
+    const from = open + 1;
+    const to = close === -1 ? tokens.length : close;
+    if (to - from === 1) {
+      tokens.splice(close, 1);
+      tokens.splice(open, 1);
+      continue;
+    }
+    let at = -1;
+    for (let i = from + 1; i < to && at === -1; i += 2) {
+      if (tokens[i] === '*' || tokens[i] === '/') at = i;
+    }
+    for (let i = from + 1; i < to && at === -1; i += 2) {
+      if (tokens[i] === '+' || tokens[i] === '-') at = i;
+    }
+    const [left, operator, right] = [tokens[at - 1], tokens[at], tokens[at + 1]];
+    const value = { '+': left + right, '-': left - right, '*': left * right, '/': left / right }[operator];
+    tokens.splice(at - 1, 3, value);
+    if (open !== -1 && tokens[open + 2] === ')') {
+      tokens.splice(open + 2, 1);
+      tokens.splice(open, 1);
+    }
+    steps.push(text(tokens));
+  }
+  return steps;
+};
