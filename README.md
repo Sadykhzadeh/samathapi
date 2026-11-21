@@ -72,6 +72,7 @@ curl -H 'Accept: text/plain' 'http://localhost:3000/gen?seed=2041'
 # 14-3 15,12,14,11 11
 ```
 
+A trailing slash and capitals in the path are ignored, so `/GEN/` is `/gen`.
 Any other path is a `404` and any method but `GET`, `HEAD` and `OPTIONS` a
 `405` with an `Allow` header, both as `{"error":"..."}`. The server is plain
 `node:http`, with no framework between it and the generator.
