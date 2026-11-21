@@ -80,7 +80,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             {
               name: 'length',
               in: 'query',
-              description: `How many numbers each task has. Without it every task draws a length from ${config.lengthFrom} to ${config.lengthTo}.`,
+              description: `How many numbers each task has. Without it every task draws a length from ${Math.min(config.lengthFrom, config.lengthTo)} to ${Math.max(config.lengthFrom, config.lengthTo)}.`,
               schema: { type: 'integer', minimum: lengthMin, maximum: lengthMax },
             },
             {

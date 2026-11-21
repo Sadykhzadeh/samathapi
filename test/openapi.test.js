@@ -114,6 +114,18 @@ test('the defaults it states are the settings the server runs on', () => {
   assert.match(parameters.length.description, /from 3 to 5/);
 });
 
+test('a length range given the other way round is described as the server draws it', async () => {
+  const reversed = createApp(readConfig({ lengthFrom: '5', lengthTo: '3' })).listen(0, '127.0.0.1');
+  await new Promise((resolve) => reversed.once('listening', resolve));
+  try {
+    const { paths } = await (await fetch(`http://127.0.0.1:${reversed.address().port}/openapi.json`)).json();
+    const length = paths['/gen'].get.parameters.find((p) => p.name === 'length');
+    assert.match(length.description, /from 3 to 5\./);
+  } finally {
+    reversed.close();
+  }
+});
+
 test('what it says a task looks like is what a task looks like', async () => {
   const { required, properties } = spec.components.schemas.Task;
   const task = await (await fetch(`${base}/gen`)).json();
