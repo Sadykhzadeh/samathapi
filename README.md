@@ -312,7 +312,7 @@ An answer of 1 KB or more, a `count` of 16 or so, is gzipped for a client whose
 `Accept-Encoding` lists `gzip`, which `curl --compressed` and every browser
 do: 7.3 KB for `count=100` becomes 1.4 KB. A seeded answer is compressed once
 and kept that way, and its gzipped form has an `ETag` of its own. So is
-`/openapi.json`, 6.0 KB of it becoming 2.1 KB, compressed once when the server
+`/openapi.json`, 6.5 KB of it becoming 2.2 KB, compressed once when the server
 starts. Nothing else is compressed, brotli included.
 
 Every task is checked before it is served: it has to work out to its answer
