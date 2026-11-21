@@ -1321,11 +1321,11 @@ test('a request whose body stalls on a kept-alive connection is closed without a
 test('a client that stalls mid-request-line is dropped at the headers timeout, and others are still served', { timeout: 15000 }, async () => {
   const app = createApp(readConfig({}), undefined, { headers: 300, request: 5000, keepAlive: 1000, check: 50 });
   const { server: slow, base: slowBase } = await listen(app);
+  const started = Date.now();
   const socket = net.connect(slow.address().port, '127.0.0.1');
   await once(socket, 'connect');
   socket.resume();
   socket.write('GET /gen?seed=1 HTT');
-  const started = Date.now();
   const closed = once(socket, 'close');
   assert.equal((await fetch(`${slowBase}/healthz`)).status, 200);
   await closed;
