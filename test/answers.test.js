@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, COUNT_MAX, createApp, drawOptions, readConfig } from '../app.js';
 import { evaluate } from '../evaluate.js';
 
+// Numbers from 0 up to 1 that a seed always gives, in the order it gives them.
+const seeded = (seed) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
 const listen = (app) => new Promise((resolve) => {
   const server = app.listen(0, '127.0.0.1', () => {
     resolve({ server, base: `http://127.0.0.1:${server.address().port}` });
@@ -135,15 +143,17 @@ test('the options of a narrow range stay above 0 without negatives and within ma
     assert.ok(options.every((o) => o >= floor && o <= ceiling), `${options} for ${answer} outside ${floor} to ${ceiling}`);
     assert.ok(options.every((o) => Math.abs(o - answer) <= 5), `${options} for ${answer}`);
   };
+  const random = seeded(1);
   for (let i = 0; i < 2000; i++) {
     for (const answer of [0, 1, 2, 3, 6, 10]) {
-      check(answer, drawOptions(answer, { min: answer, max: answer }, Math.random, { floor: 0, ceiling: 10 }), 0, 10);
+      check(answer, drawOptions(answer, { min: answer, max: answer }, random, { floor: 0, ceiling: 10 }), 0, 10);
     }
   }
   // Where a room is open on both sides, the answer is as likely to be any of the four.
   const ranks = [0, 0, 0, 0];
+  const rankRandom = seeded(2);
   for (let i = 0; i < 20000; i++) {
-    const options = drawOptions(50, { min: 50, max: 50 }, Math.random, { floor: 0, ceiling: 100 });
+    const options = drawOptions(50, { min: 50, max: 50 }, rankRandom, { floor: 0, ceiling: 100 });
     ranks[options.filter((o) => o < 50).length]++;
   }
   for (const count of ranks) assert.ok(Math.abs(count - 5000) < 400, `ranks ${ranks}`);
