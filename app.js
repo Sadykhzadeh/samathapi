@@ -704,6 +704,8 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     answerLeast: ANSWER_LEAST,
     answerLimit: ANSWER_LIMIT,
     answerSpan: ANSWER_SPAN,
+    defaultRange: DEFAULT_RANGE,
+    redraws: REDRAWS,
     config,
   }));
 
