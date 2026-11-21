@@ -129,7 +129,7 @@ is ignored, so a client may send more than an older server takes, unless it is
 a misspelling of one it does: `bracket=true` is a `400`,
 `unknown parameter "bracket", did you mean brackets?`, rather than a worksheet
 without brackets. Options that samathgen refuses, because no task can be
-built from them, are a `400` with its message, `no task of 8 terms evaluating
+built from them, are a `400` with its message, `no task of 10 terms evaluating
 to an answer from 10 to 20 can be built from / without brackets`. A task that
 cannot be generated for any other reason is a `500` in the same two formats,
 with the message `could not generate a task`.
@@ -204,7 +204,7 @@ who has noticed that 11 is never the answer can rule it out.
 
 A few combinations cannot be built, and a request that gets no task is a `400`
 that says which. `divide` alone with `brackets=never` runs out of room at 8
-numbers, where about one request in four is built, and at 10 none is; from 3
+numbers, where about one request in five is built, and at 10 none is; from 3
 under `max=10` none is. `subtract` alone with `negatives=false` and
 `brackets=never` under `max=20` builds about half its tasks at 7 numbers and
 few at 8; and `add` alone cannot make 12 numbers within `max=10` without
