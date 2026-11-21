@@ -3,6 +3,15 @@
   "version": "1.0.0",
   "description": "A bridge between SaMathGen and SaMathCLI",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "app.js",
+    "cache.js",
+    "evaluate.js",
+    "openapi.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node .",
     "test": "node --test",
