@@ -437,7 +437,7 @@ const readRequest = (query, config, asText) => {
 };
 
 // The query string as an object: a name sent once is its value, a name sent
-// again turns into an array of its values, as the framework used to do.
+// again turns into an array of its values.
 const readQuery = (url) => {
   const query = Object.create(null);
   const at = url.indexOf('?');
