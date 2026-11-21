@@ -120,6 +120,24 @@ test('a port that is already taken is one clear line and exit code 1', async () 
   }
 });
 
+test('a port the user may not open is one clear line and exit code 1', async () => {
+  // Makes listen fail as it does for a privileged port opened without the rights for it.
+  const refuse = 'data:text/javascript,import net from "node:net";net.Server.prototype.listen=function(){process.nextTick(()=>this.emit("error",Object.assign(new Error("listen EACCES"),{code:"EACCES"})));return this;}';
+  const child = spawn(process.execPath, ['--import', refuse, '.'], {
+    cwd: root,
+    env: { ...process.env, PORT: '80' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  child.stdout.on('data', (chunk) => { stdout += chunk; });
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
+  const [code] = await once(child, 'exit');
+  assert.equal(code, 1);
+  assert.equal(stderr.trim(), 'permission denied for port 80, so choose another PORT');
+  assert.equal(stdout, '');
+});
+
 test('a length the settings cannot build stops the server before it listens, with the reason', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port), operators: 'divide', brackets: 'never', lengthFrom: '10', lengthTo: '12' });

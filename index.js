@@ -33,6 +33,10 @@ server.on('error', (error) => {
     console.error(`port ${config.port} is already in use`);
     process.exit(1);
   }
+  if (error.code === 'EACCES') {
+    console.error(`permission denied for port ${config.port}, so choose another PORT`);
+    process.exit(1);
+  }
   throw error;
 })
 
