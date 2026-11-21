@@ -43,7 +43,7 @@ const option = (name, fallback, valid, rule) => {
   args.splice(at, 2);
   return value;
 };
-const seconds = option('seconds', 3, (n) => n > 0, 'a number above 0');
+const seconds = option('seconds', 3, (n) => Number.isFinite(n) && n > 0, 'a number above 0');
 const connections = option('connections', 16, (n) => Number.isInteger(n) && n > 0, 'a whole number above 0');
 const gzip = args.includes('--gzip');
 if (gzip) args.splice(args.indexOf('--gzip'), 1);

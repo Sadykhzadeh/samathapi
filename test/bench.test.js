@@ -24,6 +24,7 @@ test('the benchmark names an option it cannot use, with its usage', async () => 
     [['--seconds', 'abc', '/healthz'], /^--seconds must be a number above 0, not "abc"$/m],
     [['--seconds'], /^--seconds must be a number above 0, not nothing$/m],
     [['--seconds', '0', '/healthz'], /^--seconds must be a number above 0, not "0"$/m],
+    [['--seconds', 'Infinity', '/healthz'], /^--seconds must be a number above 0, not "Infinity"$/m],
     [['--connections', '0', '/healthz'], /^--connections must be a whole number above 0, not "0"$/m],
     [['--connections', '2.5', '/healthz'], /^--connections must be a whole number above 0, not "2.5"$/m],
     [['--gzp', '/healthz'], /^unknown option --gzp$/m],
