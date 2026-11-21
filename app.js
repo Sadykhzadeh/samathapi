@@ -500,11 +500,15 @@ const REDRAWS = 500;
 
 const drawFresh = (generate, request, config, asked, budget) => {
   let result;
+  let text;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
     result = drawTask(generate, request, config);
-    if (!result || !asked.has(result.task.join(''))) break;
+    if (!result) break;
+    text = result.task.join('');
+    if (!asked.has(text)) break;
     if (--budget.redraws < 0) break;
   }
+  if (result) asked.add(text);
   return result;
 };
 
@@ -520,7 +524,6 @@ const drawTasks = (generate, request, config) => {
       ? drawFresh(generate, request, config, asked, budget)
       : drawTask(generate, request, config, (request.seed + i) % (SEED_MAX + 1));
     if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
-    asked.add(result.task.join(''));
     tasks.push(result);
   }
   return tasks;
