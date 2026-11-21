@@ -105,6 +105,12 @@ test('the defaults in the README settings table are the ones the server reads', 
   }
 });
 
+test('the error the README quotes and the clamp it describes are the server\'s', async () => {
+  const { error } = await (await fetch(`${base}/gen?length=40`)).json();
+  assert.ok(readme.includes(JSON.stringify({ error })), error);
+  assert.ok(readme.includes(`clamped to ${LENGTH_MIN}..${LENGTH_MAX}`));
+});
+
 test('the operators and numbers the README states are the server\'s', () => {
   const [row] = rowsOf('operators');
   for (const name of Object.keys(OPERATOR_NAMES)) assert.ok(row.includes(`\`${name}\``), name);
