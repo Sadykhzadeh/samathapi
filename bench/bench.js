@@ -50,7 +50,7 @@ if (gzip) args.splice(args.indexOf('--gzip'), 1);
 const unknown = args.find((arg) => arg.startsWith('--'));
 if (unknown !== undefined) fail(`unknown option ${unknown}`);
 
-const scenarios = args.length > 0 ? args : [
+const scenarios = (args.length > 0 ? args : [
   '/healthz',
   '/gen',
   '/gen?c=true',
@@ -61,7 +61,7 @@ const scenarios = args.length > 0 ? args : [
   '/gen?count=100&seed=2024&length=12&brackets=true',
   '/gen?count=100&answerMin=50&answerMax=100',
   '/gen?count=100&length=12&brackets=true',
-];
+]).map((path) => (path.startsWith('/') ? path : `/${path}`));
 
 const freePort = async () => {
   const probeServer = net.createServer().listen(0, '127.0.0.1');
@@ -153,7 +153,7 @@ const idleRss = await rssOf(child);
 
 const rows = [];
 for (const path of scenarios) {
-  await load(port, path.startsWith('/') ? path : `/${path}`).then(() => {}, () => {});
+  await load(port, path).then(() => {}, () => {});
   rows.push(await load(port, path));
 }
 const loadedRss = await rssOf(child);

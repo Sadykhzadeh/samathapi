@@ -50,6 +50,13 @@ test('the benchmark reports its start, its memory and each path it is given, wit
   assert.deepEqual(rows.map((cells) => cells.at(-1)), ['0', '0']);
 });
 
+test('the benchmark takes a path given without its leading slash', { timeout: 60_000 }, async () => {
+  const { stdout } = await run(process.execPath, [bench, '--seconds', '0.2', 'healthz']);
+  const rows = stdout.split('\n').filter((line) => line.includes("'/")).map((line) => line.split('│').map((cell) => cell.trim()).filter(Boolean));
+  assert.deepEqual(rows.map((cells) => cells.slice(1, 2)), [["'/healthz'"]]);
+  assert.deepEqual(rows.map((cells) => cells.at(-1)), ['0']);
+});
+
 const parentOf = async (pid) => {
   for (const entry of await readdir('/proc')) {
     if (!/^[0-9]+$/.test(entry)) continue;
