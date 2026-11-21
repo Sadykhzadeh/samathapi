@@ -23,6 +23,10 @@ cp .sample.env .env   # optional
 npm start
 ```
 
+The server listens on port 3000 unless `PORT` says otherwise. Its settings come
+from the environment or from a `.env` beside `index.js`, and are listed under
+Configuration below; `accessLog=true`, for one, prints a line per answer.
+
 On `SIGTERM` or `SIGINT`, which is what `docker stop`, systemd and Ctrl-C
 send, the server stops taking connections, answers the requests it has and
 exits with code 0; one still open after 10 seconds is cut and the exit code
