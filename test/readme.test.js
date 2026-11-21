@@ -1,9 +1,10 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { parse } from 'dotenv';
 import {
   ANSWER_LEAST, ANSWER_LIMIT, ANSWER_SPAN, CACHE_BYTES, COUNT_MAX, DEFAULT_RANGE, LENGTH_MAX, LENGTH_MIN, MAX_LEAST, MAX_MOST,
-  OPERATOR_NAMES, REDRAWS, SEED_MAX, createApp, readConfig,
+  OPERATOR_NAMES, PARAMETERS, REDRAWS, SEED_MAX, createApp, readConfig,
 } from '../app.js';
 
 // "<task> <opt1>,<opt2>,<opt3>,<opt4> <answer>"
@@ -75,6 +76,7 @@ test('the output shown under an unseeded example has the right shape', async () 
 });
 
 const rowsOf = (name) => readme.split('\n').filter((line) => line.startsWith(`| \`${name}\``));
+const namedInTable = (name) => readme.split('\n').some((line) => line.startsWith('| ') && line.split('|')[1].includes(`\`${name}\``));
 
 test('the limits in the README tables are the ones the server enforces', () => {
   const span = (from, to) => `\`${from}\` to \`${to}\``;
@@ -108,4 +110,14 @@ test('the operators and numbers the README states are the server\'s', () => {
   for (const name of Object.keys(OPERATOR_NAMES)) assert.ok(row.includes(`\`${name}\``), name);
   assert.ok(readme.includes(`${REDRAWS} times in all`), 'the repeat limit');
   assert.ok(readme.includes(`up to ${CACHE_BYTES / 2 ** 20} MB`), 'the cache size');
+});
+
+test('the README lists every parameter and setting the server reads', () => {
+  const settings = ['PORT', 'lengthFrom', 'lengthTo', 'brackets', 'negatives', 'answerMin', 'answerMax', 'max', 'operators', 'accessLog'];
+  for (const name of [...PARAMETERS, ...settings]) assert.ok(namedInTable(name), name);
+});
+
+test('copying .sample.env, as the usage section suggests, changes no setting', () => {
+  const sample = parse(readFileSync(new URL('../.sample.env', import.meta.url)));
+  assert.deepEqual(readConfig(sample), readConfig({}));
 });
