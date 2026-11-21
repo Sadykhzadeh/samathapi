@@ -36,6 +36,13 @@ test('the benchmark names an option it cannot use, with its usage', async () => 
   }
 });
 
+test('the benchmark stops at a path that does not answer 200, with the answer, and measures nothing', { timeout: 60_000 }, async () => {
+  const error = await refused(['--seconds', '0.2', '/healthz', '/gen?length=40']);
+  assert.equal(error.code, 1);
+  assert.equal(error.stdout, '');
+  assert.equal(error.stderr.trim(), '/gen?length=40 answered 400, so it is not measured: {"error":"length must be a whole number from 2 to 12, not \\"40\\""}');
+});
+
 test('the benchmark prints its usage for --help', async () => {
   const { stdout } = await run(process.execPath, [bench, '--help']);
   assert.match(stdout, /^usage: node bench\/bench\.js \[--seconds n\]/);

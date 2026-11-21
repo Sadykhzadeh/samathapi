@@ -151,6 +151,17 @@ for (;;) {
 const coldStart = performance.now() - spawned;
 const idleRss = await rssOf(child);
 
+// A path the server does not answer with 200 is refused rather than measured:
+// a 400 is quicker than a task, so its numbers would say nothing about a quiz.
+for (const path of scenarios) {
+  const answer = await fetch(`http://127.0.0.1:${port}${path}`);
+  const text = await answer.text();
+  if (answer.status !== 200) {
+    console.error(`${path} answered ${answer.status}, so it is not measured: ${text.trim()}`);
+    process.exit(1);
+  }
+}
+
 const rows = [];
 for (const path of scenarios) {
   await load(port, path).then(() => {}, () => {});
