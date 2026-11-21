@@ -603,9 +603,10 @@ const ENTRY_OVERHEAD = 128;
 const costOf = (key, entry) => key.length + entry.body.length + entry.etag.length
   + (entry.gzip?.length ?? 0) + ENTRY_OVERHEAD;
 
-// How long a client or a cache in between may reuse a seeded answer without
-// asking. Upgrading samathgen can change what a seed names, so not for ever.
-const SEEDED_CACHE_CONTROL = 'public, max-age=3600';
+// How long a client or a cache in between may reuse a seeded answer, or the
+// description, without asking. Upgrading samathgen can change what a seed
+// names, so not for ever.
+const HOUR_CACHE_CONTROL = 'public, max-age=3600';
 
 // Below this a body is not worth compressing: it already fits a packet.
 const GZIP_FROM = 1024;
@@ -706,6 +707,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     answerSpan: ANSWER_SPAN,
     defaultRange: DEFAULT_RANGE,
     redraws: REDRAWS,
+    cacheControl: HOUR_CACHE_CONTROL,
     config,
   }));
 
@@ -782,7 +784,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     }
     const body = packed ? entry.gzip : entry.body;
     const etag = packed ? `${entry.etag.slice(0, -1)}-gzip"` : entry.etag;
-    const headers = { ETag: etag, 'Cache-Control': SEEDED_CACHE_CONTROL, ...(packed && GZIPPED) };
+    const headers = { ETag: etag, 'Cache-Control': HOUR_CACHE_CONTROL, ...(packed && GZIPPED) };
     if (matches(req.headers['if-none-match'], etag)) {
       res.writeHead(304, { Vary: VARY, ...EVERY_ANSWER, ...headers });
       res.end();
@@ -797,7 +799,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     '/openapi.json': (req, res) => {
       const packed = acceptsGzip(req.headers['accept-encoding']);
       const etag = packed ? specGzipTag : specTag;
-      const headers = { ETag: etag, 'Cache-Control': 'public, max-age=3600', Vary: 'Accept-Encoding', ...(packed && GZIPPED) };
+      const headers = { ETag: etag, 'Cache-Control': HOUR_CACHE_CONTROL, Vary: 'Accept-Encoding', ...(packed && GZIPPED) };
       if (matches(req.headers['if-none-match'], etag)) {
         res.writeHead(304, { ...EVERY_ANSWER, ...headers });
         res.end();

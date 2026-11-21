@@ -1,7 +1,7 @@
 // The OpenAPI description of the server, built from the limits and settings
 // the server itself runs on, so it cannot say 2 to 12 where the code says
 // something else.
-export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, operatorNames, maxLeast, maxMost, answerLeast, answerLimit, answerSpan, defaultRange, redraws, config }) => {
+export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, operatorNames, maxLeast, maxMost, answerLeast, answerLimit, answerSpan, defaultRange, redraws, cacheControl, config }) => {
   const maxDefault = config.max ?? maxMost;
   const answersDefault = config.answers
     ? `the answers are from ${config.answers.min} to ${config.answers.max}, as the server is set up`
@@ -138,7 +138,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             200: {
               description: 'The task, or a list of them with count',
               headers: {
-                'Cache-Control': { description: 'public, max-age=3600 with a seed; no-store without.', schema: { type: 'string' } },
+                'Cache-Control': { description: `${cacheControl} with a seed; no-store without.`, schema: { type: 'string' } },
                 ETag: { description: 'With a seed. A matching If-None-Match is answered with 304.', schema: { type: 'string' } },
               },
               content: {
