@@ -140,7 +140,7 @@ export const DEFAULT_RANGE = { min: 10, max: 20 };
 // so they are worked out from 0 to the width and moved along by the least
 // number of the range that asks for them.
 const buildOptionSets = (width) => {
-  if (width + 1 < 4) return new Map();
+  if (width + 1 < 4) return { holding: new Map() };
   const sets = [];
   for (let low = 0; low + 3 <= width; low++) {
     for (let places = 1; places < 64; places += 2) {
@@ -152,24 +152,28 @@ const buildOptionSets = (width) => {
       }
     }
   }
-  const holding = new Map();
-  for (let n = 0; n <= width; n++) {
-    holding.set(n, sets.filter((set) => set.numbers.includes(n)));
-  }
+  const weights = Float64Array.from(sets, (set) => set.weight);
+  const flat = Uint16Array.from(sets.flatMap((set) => set.numbers));
+  const lists = Array.from({ length: width + 1 }, () => []);
+  sets.forEach(({ numbers: held }, index) => {
+    for (const n of held) lists[n].push(index);
+  });
+  const holding = new Map(lists.map((list, n) => [n, Int32Array.from(list)]));
   for (let round = 0; round < 200; round++) {
     for (const group of holding.values()) {
-      const total = group.reduce((sum, set) => sum + set.weight, 0);
-      for (const set of group) set.weight /= total;
+      let total = 0;
+      for (let i = 0; i < group.length; i++) total += weights[group[i]];
+      for (let i = 0; i < group.length; i++) weights[group[i]] /= total;
     }
   }
-  return holding;
+  return { holding, numbers: flat, weights };
 };
 
 // Building a width's sets takes a few milliseconds for the widest. A request
 // can ask for at most ANSWER_SPAN + 1 widths, so every width is kept once it
 // is built, and a range that starts somewhere new costs no building, since
-// only its width is looked up. With all 101 widths built the map holds about
-// 8 MB of heap, outside the 4 MB answer cache.
+// only its width is looked up. With all 101 widths built the sets hold about
+// 1.3 MB of heap, outside the 4 MB answer cache.
 const optionSetsByWidth = new Map();
 const optionSetsFor = (width) => {
   let sets = optionSetsByWidth.get(width);
@@ -195,11 +199,18 @@ const defaultRange = (max) => (max === undefined || max >= 20
 // where the window must stop, and the answer then takes the places in it that
 // have room, each as likely as the others, as samathgen does near its ends.
 export const drawOptions = (answer, range = DEFAULT_RANGE, random = Math.random, { floor = -Infinity, ceiling = Infinity } = {}) => {
-  const sets = optionSetsFor(range.max - range.min).get(answer - range.min);
-  if (sets) {
+  const { holding, numbers, weights } = optionSetsFor(range.max - range.min);
+  const members = holding.get(answer - range.min);
+  if (members) {
     let left = random();
-    const set = sets.find(({ weight }) => (left -= weight) < 0) ?? sets.at(-1);
-    return shuffle(set.numbers.map((number) => number + range.min), random);
+    let chosen = members[members.length - 1];
+    for (const member of members) {
+      if ((left -= weights[member]) < 0) {
+        chosen = member;
+        break;
+      }
+    }
+    return shuffle([0, 1, 2, 3].map((i) => numbers[chosen * 4 + i] + range.min), random);
   }
   const below = answer - floor;
   const above = ceiling - answer;
