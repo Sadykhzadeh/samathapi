@@ -15,6 +15,8 @@
 
 ## Usage
 
+The server needs Node 18.19 or later.
+
 ```sh
 npm install
 cp .sample.env .env   # optional
