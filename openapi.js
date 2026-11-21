@@ -133,6 +133,12 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
               description: 'Makes the answer the same every time. Task i of a count is the task for seed + i, wrapping after the largest seed.',
               schema: { type: 'integer', minimum: 0, maximum: seedMax },
             },
+            {
+              name: 'working',
+              in: 'query',
+              description: 'true adds to each task of the JSON answer its working: the task, then the task after each operation, down to the answer. The plain-text line has no room for it, so with c=true or a text/plain Accept it is a 400.',
+              schema: { type: 'boolean', default: false },
+            },
           ],
           responses: {
             200: {
@@ -175,6 +181,11 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
               example: [3, '*', 9, '*', 2, '/', '(', 4, '-', 1, ')'],
             },
             answer: { type: 'integer' },
+            working: {
+              type: 'array',
+              description: 'Only with working=true: the task after each operation, from the task as it was given to the answer.',
+              items: { type: 'string' },
+            },
             quizOptions: {
               type: 'array',
               description: 'Four whole numbers, one of them the answer, in no particular order.',

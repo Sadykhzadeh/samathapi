@@ -118,7 +118,7 @@ test('what it says a task looks like is what a task looks like', async () => {
   const { required, properties } = spec.components.schemas.Task;
   const task = await (await fetch(`${base}/gen`)).json();
   assert.deepEqual(Object.keys(task).sort(), [...required].sort());
-  assert.deepEqual(Object.keys(properties).sort(), [...required].sort());
+  assert.deepEqual(Object.keys(properties).sort(), [...required, 'working'].sort());
   assert.equal(properties.quizOptions.minItems, task.quizOptions.length);
   assert.equal(properties.quizOptions.maxItems, task.quizOptions.length);
   assert.ok(Number.isInteger(task.answer));

@@ -85,12 +85,22 @@ curl 'http://localhost:3000/gen?brackets=true&negatives=false&seed=5'
 | --- | --- |
 | `task` | The task in pieces, numbers as numbers and the rest as strings. `task.join('')` is the text to show, `20*(5+2)/10`. |
 | `answer` | What the task works out to, a whole number. |
+| `working` | Only with `working=true`: the task after each step of working it out, from the task as it was sent down to the answer. See below. |
 | `quizOptions` | Four whole numbers to choose from, one of them `answer`, in no particular order. They are four of six numbers in a row, and `answer` is as likely to be the smallest of them as the largest or either between, so a pupil cannot pick it by its size. samathgen gives every task an answer from 10 to 20, or from the range a request asks for with `answerMin` and `answerMax`, so the options stay within that range as well, drawn so that whichever four a pupil sees, each is as likely to be the answer as the others: a pupil who knows the range cannot rule any of them out. |
 
 Read the task by joining it rather than piece by piece: samathgen 1.0 sends
 each bracket as a string of its own, `"("` and `")"`, where 0.1.3 sent a bracketed
 group as a single string such as `"(4-1)"`. A number can be negative, as `-3`
 is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
+
+With `working=true` each task also has `working`: the task, then the task after
+each operation, * and / before + and -, down to the answer. It is what a pupil
+writes down to check a reply, and the last step is always the answer:
+
+```sh
+curl 'http://localhost:3000/gen?working=true&negatives=false&brackets=true&length=4&seed=2041'
+# {"task":[23,"-","(",30,"-",21,")","-",3],"answer":11,"quizOptions":[12,11,10,13],"working":["23-(30-21)-3","23-9-3","14-3","11"]}
+```
 
 `/gen` also takes:
 
@@ -103,6 +113,7 @@ is in `5+(-3)`, which is the list `5`, `"+"`, `"("`, `-3`, `")"`.
 | `max` | how far from zero any number may be, a whole number from `10` to `10000` | the `max` setting, or `10000` |
 | `count` | how many tasks, `1` to `100` | one task |
 | `seed` | a whole number from `0` to `4294967295` | none: every request is different |
+| `working` | `true` or `false` | `false`; `true` adds the working of each task to the JSON answer, as above. With `c=true` or an `Accept` that asks for `text/plain` the plain line has no room for it, so that is a `400` |
 | `answerMin`, `answerMax` | the least and greatest answer, whole numbers from `0` to `10000` with at most `100` between them; both or neither | the `answerMin` and `answerMax` settings, or `10` and `20`, or from half of a `max` below 20 up to it |
 
 ```sh

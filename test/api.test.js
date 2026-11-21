@@ -1333,3 +1333,37 @@ test('a client that stalls mid-request-line is dropped at the headers timeout, a
   assert.ok(elapsed >= 250 && elapsed < 4000, `dropped after ${elapsed} ms`);
   slow.close();
 });
+
+test('working=true lists the working of each task in the JSON answer, down to the answer', async () => {
+  const task = await (await fetch(`${base}/gen?working=true&negatives=false&brackets=true&length=4&seed=2041`)).json();
+  assert.deepEqual(task.working, ['23-(30-21)-3', '23-9-3', '14-3', '11']);
+  assert.equal(task.working.at(-1), String(task.answer));
+
+  const list = await (await fetch(`${base}/gen?working=true&count=20&length=5`)).json();
+  assert.equal(list.length, 20);
+  for (const { task: pieces, answer, working } of list) {
+    assert.equal(working[0], pieces.join(''));
+    assert.equal(working.at(-1), String(answer));
+    for (const step of working) assert.equal(evaluate(step), answer, step);
+  }
+});
+
+test('the answer without working is the same as before the parameter, and working=false is that answer', async () => {
+  const plain = await fetch(`${base}/gen?seed=2041&count=3`);
+  const off = await fetch(`${base}/gen?seed=2041&count=3&working=false`);
+  assert.equal(await off.text(), await plain.text());
+  assert.equal(off.headers.get('etag'), plain.headers.get('etag'));
+  const on = await fetch(`${base}/gen?seed=2041&count=3&working=true`);
+  assert.notEqual(on.headers.get('etag'), plain.headers.get('etag'));
+});
+
+test('working is refused with the plain-text line, and a value other than true or false is named', async () => {
+  const plainLine = await fetch(`${base}/gen?c=true&working=true`);
+  assert.equal(plainLine.status, 400);
+  assert.equal(await plainLine.text(), 'working is only for the JSON answer, not the plain line');
+  const accepted = await fetch(`${base}/gen?working=true`, { headers: { accept: 'text/plain' } });
+  assert.equal(accepted.status, 400);
+  const maybe = await fetch(`${base}/gen?working=maybe`);
+  assert.equal(maybe.status, 400);
+  assert.deepEqual(await maybe.json(), { error: 'working must be true or false, not "maybe"' });
+});

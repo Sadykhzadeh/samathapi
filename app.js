@@ -4,7 +4,7 @@ import http from 'node:http';
 import { gzipSync } from 'node:zlib';
 import { mathGen } from 'samathgen';
 import { createCache } from './cache.js';
-import { evaluate } from './evaluate.js';
+import { evaluate, workingOf } from './evaluate.js';
 import { buildSpec } from './openapi.js';
 
 // Node's own defaults are 300 s for a whole request and 60 s for its headers,
@@ -303,7 +303,7 @@ const complaint = (name, rule, value) => (Array.isArray(value)
 // more than an older server takes, unless it is a typo of one it does: a
 // teacher who sends bracket=true should hear that it did nothing, not get a
 // worksheet without brackets.
-export const PARAMETERS = ['length', 'brackets', 'negatives', 'operators', 'max', 'count', 'seed', 'answerMin', 'answerMax'];
+export const PARAMETERS = ['length', 'brackets', 'negatives', 'operators', 'max', 'count', 'seed', 'answerMin', 'answerMax', 'working'];
 
 const LONGEST = Math.max(...PARAMETERS.map((name) => name.length));
 
@@ -343,8 +343,8 @@ const misspelt = (name) => {
   return near && `unknown parameter ${sent(name)}, did you mean ${near}?`;
 };
 
-const readRequest = (query, config) => {
-  const { length, brackets, negatives, operators, max, count, seed } = query;
+const readRequest = (query, config, asText) => {
+  const { length, brackets, negatives, operators, max, count, seed, working } = query;
   const request = {
     length: undefined,
     brackets: config.brackets,
@@ -354,6 +354,7 @@ const readRequest = (query, config) => {
     count: undefined,
     seed: undefined,
     answers: undefined,
+    working: false,
   };
   const errors = Object.keys(query).map(misspelt).filter(Boolean);
   if (Array.isArray(query.c)) errors.push(`c was sent ${query.c.length} times, send it once`);
@@ -401,6 +402,11 @@ const readRequest = (query, config) => {
     if (parsed <= SEED_MAX) request.seed = parsed;
     else errors.push(complaint('seed', `a whole number from 0 to ${SEED_MAX}`, seed));
   }
+  if (working !== undefined) {
+    if (working === 'true' || working === 'false') request.working = working === 'true';
+    else errors.push(complaint('working', 'true or false', working));
+  }
+  if (request.working && asText) errors.push('working is only for the JSON answer, not the plain line');
   const { answerMin, answerMax } = query;
   if (answerMin !== undefined || answerMax !== undefined) {
     const rule = `a whole number from ${ANSWER_LEAST} to ${ANSWER_LIMIT}`;
@@ -727,19 +733,20 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     // An error comes in the format the request asked for, as the bare
     // message for c=true and as {"error": "..."} otherwise.
     const fail = (status, message) => answer(status, asText ? message : JSON.stringify({ error: message }));
-    const request = readRequest(query, config);
+    const request = readRequest(query, config, asText);
     if (request.error) {
       fail(400, request.error);
       return;
     }
 
     const render = (tasks) => {
-      if (request.count === undefined) return asText ? cliLine(tasks[0]) : JSON.stringify(tasks[0]);
-      return asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(tasks);
+      const shown = request.working ? tasks.map((task) => ({ ...task, working: workingOf(task.task) })) : tasks;
+      if (request.count === undefined) return asText ? cliLine(tasks[0]) : JSON.stringify(shown[0]);
+      return asText ? `${tasks.map(cliLine).join('\n')}\n` : JSON.stringify(shown);
     };
     const key = request.seed === undefined ? undefined : [
       asText, request.length, request.brackets, request.negatives, request.operators, request.max, request.count, request.seed,
-      request.answers?.min, request.answers?.max,
+      request.answers?.min, request.answers?.max, request.working,
     ].join();
     let entry = key === undefined ? undefined : cache.get(key);
     if (entry === undefined) {
