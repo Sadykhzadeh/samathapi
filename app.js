@@ -888,6 +888,12 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     res.on('finish', () => socket.end());
     send(res, 405, JSON_TYPE, '{"error":"method not allowed"}', { Allow: ALLOWED, Connection: 'close' });
   });
+  // An Expect header other than 100-continue is answered by Node with a bare
+  // 417 and no request event, so it gets the JSON error and its log line here.
+  server.on('checkExpectation', (req, res) => {
+    if (config.accessLog) logAccess(req, res);
+    send(res, 417, JSON_TYPE, '{"error":"expectation failed"}');
+  });
   // A request the parser refuses, a head over 16 KB, one that is not HTTP or one
   // that runs past a timeout, gets the JSON error the other refusals get, with
   // the CORS header, so a page on another origin can read why. Node would

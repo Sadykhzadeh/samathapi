@@ -1072,6 +1072,18 @@ test('a CONNECT gets the 405 the other methods get, and its connection is closed
   assert.ok(reply.endsWith('{"error":"method not allowed"}'), reply);
 });
 
+test('an Expect other than 100-continue gets a JSON 417 with the CORS header', async () => {
+  const { port } = server.address();
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.end('GET /gen HTTP/1.1\r\nHost: x\r\nExpect: foo\r\nConnection: close\r\n\r\n');
+  let reply = '';
+  for await (const chunk of socket) reply += chunk;
+  assert.match(reply, /^HTTP\/1\.1 417 Expectation Failed\r\n/);
+  assert.match(reply, /\r\nAccess-Control-Allow-Origin: \*\r\n/);
+  assert.ok(reply.endsWith('{"error":"expectation failed"}'), reply);
+});
+
 test('a target sent as a full URL, as a proxy sends it, reaches the same endpoint', async () => {
   const { port } = server.address();
   for (const target of [`http://127.0.0.1:${port}/healthz`, `http://example.test/gen?c=true`, `HTTP://example.test/gen/`]) {

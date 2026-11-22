@@ -375,6 +375,28 @@ test('accessLog prints a line for a request the parser refuses, as it does for e
   assert.match(lines[1], /^- - 431 [0-9.]+ ms$/);
 });
 
+test('accessLog prints a line for a request refused for its Expect header', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), accessLog: 'true' });
+  try {
+    await server.listening;
+    const status = await new Promise((resolve, reject) => {
+      const socket = net.connect(port, '127.0.0.1', () => socket.write('GET /gen?seed=1 HTTP/1.1\r\nHost: x\r\nExpect: foo\r\nConnection: close\r\n\r\n'));
+      let reply = '';
+      socket.on('data', (chunk) => { reply += chunk; });
+      socket.on('close', () => resolve(reply.split('\r\n')[0]));
+      socket.on('error', reject);
+    });
+    assert.match(status, /^HTTP\/1\.1 417 /);
+  } finally {
+    server.child.send('stop');
+    assert.equal(await server.exited, 0);
+  }
+  const lines = server.output.stdout.trim().split('\n').filter((line) => /^GET /.test(line));
+  assert.equal(lines.length, 1, server.output.stdout);
+  assert.match(lines[0], /^GET \/gen 417 [0-9.]+ ms$/);
+});
+
 test('without accessLog the server prints nothing but its address', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port) });
