@@ -177,7 +177,7 @@ const loadedRss = await rssOf(child);
 console.log(`node ${process.version}, ${connections} connections${gzip ? ', gzip' : ''}, ${seconds} s per path after a warm-up of the same length`);
 console.log(`cold start to first response: ${coldStart.toFixed(0)} ms`);
 console.log(`memory: ${(idleRss / 2 ** 20).toFixed(1)} MB at idle, ${(loadedRss / 2 ** 20).toFixed(1)} MB after the run`);
-console.table(rows);
+console.table(Object.fromEntries(rows.map(({ path, ...row }) => [path, row])));
 
 finished = true;
 child.kill();
