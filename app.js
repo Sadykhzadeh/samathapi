@@ -590,14 +590,22 @@ const pathOf = (url) => {
 // One line per answer on stdout, for a log collector. The query string is left
 // out, since a parameter is not something a log should keep; a request that
 // ends before its answer is complete is logged as aborted.
-const logAccess = (req, res) => {
-  const began = process.hrtime.bigint();
-  res.on('close', () => {
+// Printed when the answer is written, or as aborted when the connection closes
+// first. Not on close alone: a stop exits once the connections have closed, and
+// a response's close event can come after that.
+const logAnswer = (method, path, res, began) => {
+  let printed = false;
+  const print = (status) => {
+    if (printed) return;
+    printed = true;
     const took = Number(process.hrtime.bigint() - began) / 1e6;
-    const status = res.writableFinished ? res.statusCode : 'aborted';
-    console.log(`${req.method} ${pathOf(req.url)} ${status} ${took.toFixed(1)} ms`);
-  });
+    console.log(`${method} ${path} ${status} ${took.toFixed(1)} ms`);
+  };
+  res.on('finish', () => print(res.statusCode));
+  res.on('close', () => print('aborted'));
 };
+
+const logAccess = (req, res) => logAnswer(req.method, pathOf(req.url), res, process.hrtime.bigint());
 
 export const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
@@ -885,6 +893,10 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
   // the CORS header, so a page on another origin can read why. Node would
   // otherwise send a bare status line. A socket that has already carried an
   // answer, such as a request whose body stalls after its 405, gets no second one.
+  // Such an answer has no method or path to log, so its line has dashes in
+  // their place and its time runs from the connection, which the timeouts count from.
+  const connected = new WeakMap();
+  if (config.accessLog) server.on('connection', (socket) => connected.set(socket, process.hrtime.bigint()));
   server.on('clientError', (error, socket) => {
     socket.on('error', () => socket.destroy());
     if (!socket.writable || socket.bytesWritten > 0) {
@@ -895,6 +907,7 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     const res = new http.ServerResponse({ method: 'GET', httpVersionMajor: 1, httpVersionMinor: 1 });
     res.assignSocket(socket);
     res.on('finish', () => socket.end());
+    if (config.accessLog) logAnswer('-', '-', res, connected.get(socket));
     send(res, status, JSON_TYPE, JSON.stringify({ error: http.STATUS_CODES[status].toLowerCase() }), { Connection: 'close' });
   });
   server.requestTimeout = timeouts.request ?? REQUEST_TIMEOUT_MS;

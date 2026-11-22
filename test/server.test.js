@@ -352,6 +352,29 @@ test('accessLog names the path of a target sent as a full URL, not the URL', asy
   assert.match(server.output.stdout, /^GET \/gen 200 [0-9.]+ ms$/m);
 });
 
+test('accessLog prints a line for a request the parser refuses, as it does for every answer', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), accessLog: 'true' });
+  try {
+    await server.listening;
+    const refused = (head) => new Promise((resolve, reject) => {
+      const socket = net.connect(port, '127.0.0.1', () => socket.write(head));
+      socket.on('data', () => {});
+      socket.on('close', resolve);
+      socket.on('error', reject);
+    });
+    await refused('BOGUS\r\n\r\n');
+    await refused(`GET /gen HTTP/1.1\r\nHost: x\r\nX-Long: ${'a'.repeat(20000)}\r\n\r\n`);
+  } finally {
+    server.child.send('stop');
+    assert.equal(await server.exited, 0);
+  }
+  const lines = server.output.stdout.trim().split('\n').filter((line) => /^- - /.test(line));
+  assert.equal(lines.length, 2, server.output.stdout);
+  assert.match(lines[0], /^- - 400 [0-9.]+ ms$/);
+  assert.match(lines[1], /^- - 431 [0-9.]+ ms$/);
+});
+
 test('without accessLog the server prints nothing but its address', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port) });
