@@ -1,7 +1,7 @@
 import { lstatSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
-import { createApp, readConfig, unbuildableLength, version } from './app.js';
+import { createApp, OPERATOR_NAMES, readConfig, unbuildableLength, version } from './app.js';
 
 const usage = 'usage: node . [--help] [--version], with the settings in the environment or in a .env beside index.js';
 // Any other argument would be ignored while the server runs on the settings it
@@ -54,7 +54,12 @@ const config = readConfig(process.env);
 // four operators without a word, so a class that has not met multiplication
 // would get it.
 if (config.operators === undefined && process.env.operators !== undefined && process.env.operators !== '') {
-  console.error(`operators must be some of add, subtract, multiply and divide, separated by commas, not ${JSON.stringify(process.env.operators)}, so the server does not start`);
+  const names = process.env.operators.split(',');
+  const twice = names.find((name, i) => names.indexOf(name) !== i);
+  const known = names.every((name) => Object.hasOwn(OPERATOR_NAMES, name));
+  console.error(twice !== undefined && known
+    ? `operators names ${twice} twice, name it once, so the server does not start`
+    : `operators must be some of add, subtract, multiply and divide, separated by commas, not ${JSON.stringify(process.env.operators)}, so the server does not start`);
   process.exit(1);
 }
 const problem = unbuildableLength(config);

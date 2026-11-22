@@ -360,6 +360,6 @@ without a `length` would be refused.
 | `negatives` | `true` | Set to `false` to keep negative numbers out of every task |
 | `answerMin`, `answerMax` | unset | The answers for every request that names neither. Both are needed: one alone is ignored. Whole numbers from `0` to `10000` with at most `100` between them, for a class that counts within 100 with a client that cannot send them, such as SaMathCLI. The range is left out when it goes past `max`, or when the generator cannot build tasks in it with the other settings. A request whose `max` is below the top of the range is a `400` unless it names a range of its own; a request's own range still decides |
 | `max` | unset | A `max` for every request that does not ask for one, a whole number from `10` to `10000`, for a class that counts within 20 or 100 with a client that cannot send it, such as SaMathCLI; a request's own `max` still decides |
-| `operators` | all four | Names of the operators every request uses unless it names its own, separated by commas, such as `add,subtract` for a class that has not met the others. A name it does not know stops the server at start |
+| `operators` | all four | Names of the operators every request uses unless it names its own, separated by commas, such as `add,subtract` for a class that has not met the others. A name it does not know, or one given twice, stops the server at start |
 | `accessLog` | `false` | Set to `true` to print one line to stdout per answer: method, path without its query string, status and time taken, such as `GET /gen 200 0.4 ms` |
 

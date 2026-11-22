@@ -231,6 +231,14 @@ test('an operators setting the server cannot read stops it before it listens, wi
   assert.equal(server.output.stdout, '');
 });
 
+test('an operators setting that names one twice stops the server before it listens, with the name', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), operators: 'add,subtract,add' });
+  assert.equal(await server.exited, 1);
+  assert.equal(server.output.stderr.trim(), 'operators names add twice, name it once, so the server does not start');
+  assert.equal(server.output.stdout, '');
+});
+
 test('a blank operators setting is the same as none, so the server starts', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port), operators: '' });
