@@ -219,6 +219,23 @@ test('a length the settings cannot build stops the server before it listens, wit
   assert.equal(server.output.stdout, '');
 });
 
+test('an operators setting the server cannot read stops it before it listens, with the setting', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), operators: 'add,subtrack' });
+  assert.equal(await server.exited, 1);
+  assert.equal(server.output.stderr.trim(), 'operators must be some of add, subtract, multiply and divide, separated by commas, not "add,subtrack", so the server does not start');
+  assert.equal(server.output.stdout, '');
+});
+
+test('a blank operators setting is the same as none, so the server starts', async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port), operators: '' });
+  await server.listening;
+  assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/healthz`)).json(), { ok: true });
+  server.child.kill();
+  await server.exited;
+});
+
 test('SIGTERM stops the server with exit code 0 even with a connection left open', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port) });

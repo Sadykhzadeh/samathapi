@@ -45,6 +45,13 @@ if (!envError && readFileSync(envPath).includes(0)) {
 for (const stream of [process.stdout, process.stderr]) stream.on('error', () => {});
 
 const config = readConfig(process.env);
+// An operators setting the server cannot read would leave every request on all
+// four operators without a word, so a class that has not met multiplication
+// would get it.
+if (config.operators === undefined && process.env.operators !== undefined && process.env.operators !== '') {
+  console.error(`operators must be some of add, subtract, multiply and divide, separated by commas, not ${JSON.stringify(process.env.operators)}, so the server does not start`);
+  process.exit(1);
+}
 const problem = unbuildableLength(config);
 if (problem) {
   console.error(`${problem}, so lengthFrom and lengthTo must be lengths it can build`);
