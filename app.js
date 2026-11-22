@@ -590,7 +590,7 @@ const logAccess = (req, res) => {
   });
 };
 
-const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+export const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 const ALLOWED = 'GET, HEAD, OPTIONS';
 

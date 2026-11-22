@@ -1,7 +1,24 @@
 import { lstatSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
-import { createApp, readConfig, unbuildableLength } from './app.js';
+import { createApp, readConfig, unbuildableLength, version } from './app.js';
+
+const usage = 'usage: node . [--help] [--version], with the settings in the environment or in a .env beside index.js';
+// Any other argument would be ignored while the server runs on the settings it
+// has, such as a port that is not the one asked for, so it is refused.
+const args = process.argv.slice(2);
+if (args.includes('--help')) {
+  console.log(usage);
+  process.exit(0);
+}
+if (args.includes('--version')) {
+  console.log(version);
+  process.exit(0);
+}
+if (args.length > 0) {
+  console.error(`${JSON.stringify(args[0])} is not an argument the server takes\n${usage}`);
+  process.exit(1);
+}
 
 // The .env beside this file rather than the one in the working directory, so a
 // service manager that starts the server from elsewhere reads the same settings.

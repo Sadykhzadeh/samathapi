@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import http from 'node:http';
 import { once } from 'node:events';
 import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
@@ -195,6 +195,20 @@ test('a port the user may not open is one clear line and exit code 1', async () 
   assert.equal(code, 1);
   assert.equal(stderr.trim(), 'permission denied for port 80, so choose another PORT');
   assert.equal(stdout, '');
+});
+
+test('--help and --version print and exit, and another argument is refused before the server listens', () => {
+  const run = (args) => spawnSync(process.execPath, ['.', ...args], { cwd: root, encoding: 'utf8', timeout: 10_000 });
+  const help = run(['--help']);
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /^usage: node \. \[--help\] \[--version\]/);
+  const version = run(['--version']);
+  assert.equal(version.status, 0);
+  assert.match(version.stdout, /^\d+\.\d+\.\d+\n$/);
+  const refused = run(['--port', '4100']);
+  assert.equal(refused.status, 1);
+  assert.equal(refused.stdout, '');
+  assert.equal(refused.stderr.split('\n')[0], '"--port" is not an argument the server takes');
 });
 
 test('a length the settings cannot build stops the server before it listens, with the reason', async () => {
