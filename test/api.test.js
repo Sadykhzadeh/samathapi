@@ -556,8 +556,18 @@ test('max from the environment is read only when it is a number from 10 to 10000
   assert.equal(readConfig({ max: '20' }).max, 20);
   assert.equal(readConfig({ max: '10' }).max, 10);
   assert.equal(readConfig({ max: '10000' }).max, 10000);
-  for (const max of ['', '9', '10001', '20.5', '20 apples', '-20', 'twenty']) {
+  for (const max of ['', '0', '9', '10001', '20.5', '20 apples', '-20', 'twenty']) {
     assert.equal(readConfig({ max }).max, undefined, max);
+  }
+});
+
+test('a query answer range up to 100 wide is served, and a wider one is a 400 that says so', async () => {
+  const app = await listen(createApp(readConfig({})));
+  try {
+    assert.equal((await fetch(`${app.base}/gen?answerMin=0&answerMax=100&count=5&seed=3`)).status, 200);
+    assert.equal(await badRequest({ base: app.base }, 'answerMin=0&answerMax=101'), 'answerMax must be at most 100 more than answerMin, 101 is 101 more than 0');
+  } finally {
+    app.server.close();
   }
 });
 
@@ -570,6 +580,18 @@ test('answerMin and answerMax in the environment are the range for every request
     }
     const own = await (await fetch(`${app.base}/gen?count=40&seed=3&answerMin=10&answerMax=12`)).json();
     for (const { answer } of own) assert.ok(answer >= 10 && answer <= 12, String(answer));
+  } finally {
+    app.server.close();
+  }
+});
+
+test('an answer range from the environment of one number gives that number as every answer', async () => {
+  assert.deepEqual(readConfig({ answerMin: '50', answerMax: '50' }).answers, { min: 50, max: 50 });
+  const app = await listen(createApp(readConfig({ answerMin: '50', answerMax: '50' })));
+  try {
+    const quiz = await (await fetch(`${app.base}/gen?count=5&seed=3`)).json();
+    assert.equal(quiz.length, 5);
+    for (const { answer } of quiz) assert.equal(answer, 50);
   } finally {
     app.server.close();
   }
