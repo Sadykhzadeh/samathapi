@@ -197,6 +197,15 @@ test('the cache holds oldest-first within its bytes, and a read keeps an entry',
   assert.equal(cache.size, 1);
 });
 
+test('an entry as big as the whole cache is kept, and one a byte bigger is not', () => {
+  const cache = createCache(10);
+  cache.set('a', { body: '1234567890' });
+  assert.equal(cache.get('a')?.body, '1234567890');
+  cache.set('b', { body: '12345678901' });
+  assert.equal(cache.get('b'), undefined);
+  assert.equal(cache.get('a')?.body, '1234567890');
+});
+
 // Memory a test can read once the garbage is gone. The buffers of a response
 // read just before a collection are only released once the event loop has
 // run, so a single collection can still count tens of megabytes of them.
