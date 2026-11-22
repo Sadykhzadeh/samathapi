@@ -291,7 +291,8 @@ const mulberry32 = (seed) => () => {
 // draws its own from the configured range. A name sent twice arrives as an
 // array, which is refused as well.
 const sent = (value) => {
-  const text = value.length > 24 ? `${value.slice(0, 24)}...` : value;
+  const characters = Array.from(value);
+  const text = characters.length > 24 ? `${characters.slice(0, 24).join('')}...` : value;
   return JSON.stringify(text);
 };
 

@@ -725,6 +725,18 @@ test('a long or odd value is shortened and quoted, not echoed raw', async () => 
   }
 });
 
+test('a value cut short is cut between characters, not inside an emoji', async () => {
+  const app = await spyApp();
+  try {
+    assert.equal(
+      await badRequest(app, `length=${encodeURIComponent(`${'a'.repeat(23)}${'😀'.repeat(2)}`)}`),
+      `length must be a whole number from 2 to 12, not "${'a'.repeat(23)}😀..."`,
+    );
+  } finally {
+    app.server.close();
+  }
+});
+
 test('count asks for a whole quiz in one request', async () => {
   for (const count of [1, 2, 20, COUNT_MAX]) {
     const res = await fetch(`${base}/gen?count=${count}`);
