@@ -27,6 +27,10 @@ const fail = (message) => {
 };
 
 const args = process.argv.slice(2);
+// What follows a `--` is a path even when it starts with a dash, so it is set
+// aside before the options are read.
+const separator = args.indexOf('--');
+const paths = separator === -1 ? [] : args.splice(separator).slice(1);
 if (args.includes('--help')) {
   console.log(usage);
   process.exit(0);
@@ -50,7 +54,8 @@ if (gzip) args.splice(args.indexOf('--gzip'), 1);
 const unknown = args.find((arg) => arg.startsWith('--'));
 if (unknown !== undefined) fail(`unknown option ${unknown}`);
 
-const scenarios = (args.length > 0 ? args : [
+const chosen = [...args, ...paths];
+const scenarios = (chosen.length > 0 ? chosen : [
   '/healthz',
   '/gen',
   '/gen?c=true',

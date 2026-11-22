@@ -43,6 +43,16 @@ test('the benchmark stops at a path that does not answer 200, with the answer, a
   assert.equal(error.stderr.trim(), '/gen?length=40 answered 400, so it is not measured: {"error":"length must be a whole number from 2 to 12, not \\"40\\""}');
 });
 
+test('the benchmark reads what follows a double dash as a path, even one with a dash in it', { timeout: 60_000 }, async () => {
+  const { stdout } = await run(process.execPath, [bench, '--seconds', '0.2', '--connections', '2', '--', '/healthz', '/gen?c=true']);
+  const rows = stdout.split('\n').filter((line) => /^│\s*\//.test(line)).map((line) => line.split('│').map((cell) => cell.trim()).filter(Boolean));
+  assert.deepEqual(rows.map((cells) => cells[0]), ['/healthz', '/gen?c=true']);
+  assert.match(stdout, /^node v\d+\.\d+\.\d+, 2 connections, 0\.2 s per path/m);
+  const error = await refused(['--', '--seconds', '/healthz']);
+  assert.equal(error.code, 1);
+  assert.match(error.stderr, /^\/--seconds answered 404/m);
+});
+
 test('the benchmark prints its usage for --help', async () => {
   const { stdout } = await run(process.execPath, [bench, '--help']);
   assert.match(stdout, /^usage: node bench\/bench\.js \[--seconds n\]/);
