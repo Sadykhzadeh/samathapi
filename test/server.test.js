@@ -88,6 +88,27 @@ test('the .env beside the server is read whatever the working directory', async 
   }
 });
 
+test('a .env saved on Windows, with a byte order mark and CRLF line endings, is read', async () => {
+  const port = await freePort();
+  const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
+  try {
+    await copyServer(dir);
+    await writeFile(join(dir, '.env'), `﻿PORT=${port}\r\nlengthFrom=6\r\nlengthTo=6\r\n`);
+    const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
+    try {
+      await server.listening;
+      assert.equal(server.output.stdout.trim(), `http://localhost:${port}`);
+      const { task } = await (await fetch(`http://127.0.0.1:${port}/gen`)).json();
+      assert.equal(task.filter((token) => typeof token === 'number').length, 6, task.join(''));
+    } finally {
+      server.child.send('stop');
+      assert.equal(await server.exited, 0);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('a .env beside the server that cannot be read stops the server rather than using the defaults', { timeout: 15000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
   try {
