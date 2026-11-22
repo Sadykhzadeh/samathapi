@@ -451,6 +451,10 @@ const readQuery = (url) => {
   return query;
 };
 
+// The weight a q parameter gives, which RFC 9110 allows as 0 to 1 with at most
+// three decimals. Any other value gives 0, as a range without a weight does.
+const weightOf = (q) => (/^q=(0(\.[0-9]{0,3})?|1(\.0{0,3})?)$/.test(q) ? Number(q.slice(2)) : 0);
+
 // How much an Accept header wants `type`: the q of the most specific range
 // that covers it, or 0 when none does.
 const wanted = (accept, type) => {
@@ -462,8 +466,7 @@ const wanted = (accept, type) => {
     const specificity = name === type ? 3 : name === `${type.split('/')[0]}/*` ? 2 : name === '*/*' ? 1 : 0;
     if (specificity <= bestSpecificity) continue;
     const q = params.map((param) => param.trim().toLowerCase()).find((param) => param.startsWith('q='));
-    const value = q === undefined ? 1 : Number(q.slice(2));
-    best = Number.isFinite(value) ? value : 0;
+    best = q === undefined ? 1 : weightOf(q);
     bestSpecificity = specificity;
   }
   return best;
@@ -627,7 +630,7 @@ const acceptsGzip = (header) => header !== undefined && header.split(',').some((
   const [name, ...params] = part.split(';');
   if (name.trim().toLowerCase() !== 'gzip') return false;
   const q = params.map((param) => param.trim().toLowerCase()).find((param) => param.startsWith('q='));
-  return q === undefined || Number(q.slice(2)) > 0;
+  return q === undefined || weightOf(q) > 0;
 });
 
 const etagOf = (body) => `"${createHash('sha256').update(body).digest('base64url').slice(0, 22)}"`;

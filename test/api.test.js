@@ -1258,6 +1258,13 @@ test('a tie between text/plain and JSON is JSON, whichever is named first', asyn
   }
 });
 
+test('a q above 1 is no weight, so text/plain with it is not the plain line', async () => {
+  for (const accept of ['text/plain;q=2', 'text/plain;q=1.5, application/json']) {
+    const res = await fetch(`${base}/gen?seed=9`, { headers: { Accept: accept } });
+    assert.match(res.headers.get('content-type'), /^application\/json/, accept);
+  }
+});
+
 test('c decides over Accept, and an error follows the same format', async () => {
   const withAccept = (query, accept) => fetch(`${base}/gen?${query}`, { headers: { Accept: accept } });
   assert.match((await withAccept('c=false', 'text/plain')).headers.get('content-type'), /^application\/json/);
