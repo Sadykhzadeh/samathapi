@@ -353,6 +353,30 @@ test('without accessLog the server prints nothing but its address', async () => 
   assert.equal(server.output.stdout.trim(), `http://localhost:${port}\nSIGTERM received, finishing open requests`);
 });
 
+test('a client that resets a CONNECT does not stop the server', { timeout: 30_000 }, async () => {
+  const port = await freePort();
+  const server = start({ PORT: String(port) });
+  try {
+    await server.listening;
+    for (let i = 0; i < 20; i++) {
+      await new Promise((resolve) => {
+        const socket = net.connect(port, '127.0.0.1', () => {
+          socket.write('CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n');
+          socket.resetAndDestroy();
+          resolve();
+        });
+        socket.on('error', () => {});
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.equal(server.child.exitCode, null, server.output.stderr);
+    assert.deepEqual(await (await fetch(`http://127.0.0.1:${port}/healthz`)).json(), { ok: true });
+  } finally {
+    server.child.kill();
+    await server.exited;
+  }
+});
+
 test('a reader that closes stdout does not stop the server answering', async () => {
   const port = await freePort();
   const server = start({ PORT: String(port), accessLog: 'true' });

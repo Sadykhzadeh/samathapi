@@ -854,10 +854,13 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     }
   });
   // A CONNECT gets the 405 that any other method the server does not take gets,
-  // and its socket is closed once that is written.
+  // and its socket is closed once that is written. A client that resets the
+  // connection first makes that write fail, and nothing else listens to the
+  // socket, so an error on it closes the socket here.
   server.on('connect', (req, socket) => {
     const res = new http.ServerResponse(req);
     if (config.accessLog) logAccess(req, res);
+    socket.on('error', () => socket.destroy());
     res.assignSocket(socket);
     res.on('finish', () => socket.end());
     send(res, 405, JSON_TYPE, '{"error":"method not allowed"}', { Allow: ALLOWED, Connection: 'close' });
