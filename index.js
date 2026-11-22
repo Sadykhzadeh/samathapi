@@ -1,14 +1,22 @@
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { createApp, readConfig, unbuildableLength } from './app.js';
 
 // The .env beside this file rather than the one in the working directory, so a
 // service manager that starts the server from elsewhere reads the same settings.
-const { error: envError } = loadEnv({ path: fileURLToPath(new URL('./.env', import.meta.url)), quiet: true });
+const envPath = fileURLToPath(new URL('./.env', import.meta.url));
+const { error: envError } = loadEnv({ path: envPath, quiet: true });
 // A .env that is there but cannot be read would leave every setting at its
 // default without a word, so the server stops instead.
 if (envError && envError.code !== 'ENOENT') {
   console.error(`${envError.message}, so the server does not start`);
+  process.exit(1);
+}
+// A file saved as UTF-16, as Windows PowerShell 5.1 saves one with `>`, has no
+// setting dotenv can read in it, which would leave every setting at its default.
+if (!envError && readFileSync(envPath).includes(0)) {
+  console.error('the .env beside the server is not UTF-8 text, so the server does not start');
   process.exit(1);
 }
 

@@ -331,8 +331,9 @@ that a fault in the generator would not reach a client.
 
 ## Configuration
 
-Read from the environment, or from a `.env` file beside `index.js`. Any value
-that is not a whole number falls back to its default, as does a `PORT` outside
+Read from the environment, or from a `.env` file beside `index.js`. A `.env` saved
+as UTF-16, which Windows PowerShell 5.1 writes with `>` by default, stops the server
+with a message rather than being ignored. Any value that is not a whole number falls back to its default, as does a `PORT` outside
 1..65535, and lengths are clamped to 2..12 so a stray setting cannot produce a
 task longer than a client will read. When the generator cannot build a task of
 some length from `lengthFrom` to `lengthTo` with the other settings, the server

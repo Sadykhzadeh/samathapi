@@ -106,6 +106,25 @@ test('a .env beside the server that cannot be read stops the server rather than 
   }
 });
 
+test('a .env beside the server saved as UTF-16 stops the server rather than being ignored', { timeout: 15000 }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
+  try {
+    await copyServer(dir);
+    await writeFile(join(dir, '.env'), Buffer.from('﻿PORT=3000\r\n', 'utf16le'));
+    const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
+    try {
+      const [code] = await once(server.child, 'exit', { signal: AbortSignal.timeout(10_000) });
+      assert.equal(code, 1);
+      assert.equal(server.output.stderr.trim(), 'the .env beside the server is not UTF-8 text, so the server does not start');
+      assert.equal(server.output.stdout, '');
+    } finally {
+      server.child.kill();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('a port that is already taken is one clear line and exit code 1', async () => {
   const port = await freePort();
   const first = start({ PORT: String(port) });
