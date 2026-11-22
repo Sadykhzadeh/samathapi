@@ -5,18 +5,23 @@ import { createApp, readConfig, unbuildableLength, version } from './app.js';
 
 const usage = 'usage: node . [--help] [--version], with the settings in the environment or in a .env beside index.js';
 // Any other argument would be ignored while the server runs on the settings it
-// has, such as a port that is not the one asked for, so it is refused.
+// has, such as a port that is not the one asked for, so it is refused. What
+// follows a `--` is never an option, so `-- --help` is refused like any other.
 const args = process.argv.slice(2);
-if (args.includes('--help')) {
+const end = args.indexOf('--');
+const options = end === -1 ? args : args.slice(0, end);
+const operands = end === -1 ? [] : args.slice(end + 1);
+if (options.includes('--help')) {
   console.log(usage);
   process.exit(0);
 }
-if (args.includes('--version')) {
+if (options.includes('--version')) {
   console.log(version);
   process.exit(0);
 }
-if (args.length > 0) {
-  console.error(`${JSON.stringify(args[0])} is not an argument the server takes\n${usage}`);
+const extra = [...options, ...operands];
+if (extra.length > 0) {
+  console.error(`${JSON.stringify(extra[0])} is not an argument the server takes\n${usage}`);
   process.exit(1);
 }
 

@@ -209,6 +209,10 @@ test('--help and --version print and exit, and another argument is refused befor
   assert.equal(refused.status, 1);
   assert.equal(refused.stdout, '');
   assert.equal(refused.stderr.split('\n')[0], '"--port" is not an argument the server takes');
+  const afterSeparator = run(['--', '--help']);
+  assert.equal(afterSeparator.status, 1);
+  assert.equal(afterSeparator.stdout, '');
+  assert.equal(afterSeparator.stderr.split('\n')[0], '"--help" is not an argument the server takes');
 });
 
 test('a length the settings cannot build stops the server before it listens, with the reason', async () => {
