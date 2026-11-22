@@ -97,17 +97,24 @@ const genNumber = (first, second, random = Math.random) => {
 // per task.
 const ATTEMPTS = 500;
 
-// `asked` is the range [low, high] the request wants the answer from.
-const isSound = ({ task, answer }, { negatives, answer: asked }) =>
-  evaluate(task.join(''), { negatives }) === answer
-  && (asked === undefined || (answer >= asked[0] && answer <= asked[1]));
+// The text of a task that is sound, undefined for one that is not. `asked` is
+// the range [low, high] the request wants the answer from.
+const soundText = ({ task, answer }, { negatives, answer: asked }) => {
+  const text = task.join('');
+  const sound = evaluate(text, { negatives }) === answer
+    && (asked === undefined || (answer >= asked[0] && answer <= asked[1]));
+  return sound ? text : undefined;
+};
 
+// Returns the task with the text it was checked as, so that a caller which needs
+// the text does not join the task a second time.
 export const drawSound = (generate, length, options) => {
   // A seed names one task, so asking again would only give the same one.
   const attempts = options.seed === undefined ? ATTEMPTS : 1;
   for (let attempt = 0; attempt < attempts; attempt++) {
     const result = generate(length, options);
-    if (isSound(result, options)) return result;
+    const text = soundText(result, options);
+    if (text !== undefined) return { result, text };
   }
   return null;
 };
@@ -508,8 +515,9 @@ const drawTask = (generate, request, config, seed) => {
   if (request.operators) options.operators = request.operators;
   if (request.max !== undefined) options.max = request.max;
   if (answers) options.answer = [answers.min, answers.max];
-  const result = drawSound(generate, length, options);
-  return result && { ...result, quizOptions: drawOptions(result.answer, answers ?? defaultRange(request.max), random, room(request)) };
+  const drawn = drawSound(generate, length, options);
+  const quizOptions = drawn && drawOptions(drawn.result.answer, answers ?? defaultRange(request.max), random, room(request));
+  return drawn && { text: drawn.text, task: { ...drawn.result, quizOptions } };
 };
 
 // A quiz asks each question once, so a task it already holds is drawn again,
@@ -520,17 +528,15 @@ const drawTask = (generate, request, config, seed) => {
 export const REDRAWS = 500;
 
 const drawFresh = (generate, request, config, asked, budget) => {
-  let result;
-  let text;
+  let drawn;
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    result = drawTask(generate, request, config);
-    if (!result) break;
-    text = result.task.join('');
-    if (!asked.has(text)) break;
+    drawn = drawTask(generate, request, config);
+    if (!drawn) break;
+    if (!asked.has(drawn.text)) break;
     if (--budget.redraws < 0) break;
   }
-  if (result) asked.add(text);
-  return result;
+  if (drawn) asked.add(drawn.text);
+  return drawn;
 };
 
 // The tasks a request asks for. Task i of a count is the task a request for
@@ -541,11 +547,11 @@ const drawTasks = (generate, request, config) => {
   const asked = new Set();
   const budget = { redraws: REDRAWS };
   for (let i = 0; i < (request.count ?? 1); i++) {
-    const result = request.seed === undefined
+    const drawn = request.seed === undefined
       ? drawFresh(generate, request, config, asked, budget)
       : drawTask(generate, request, config, (request.seed + i) % (SEED_MAX + 1));
-    if (!result) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
-    tasks.push(result);
+    if (!drawn) throw new Error(`no sound task in ${ATTEMPTS} attempts`);
+    tasks.push(drawn.task);
   }
   return tasks;
 };

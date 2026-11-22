@@ -120,7 +120,7 @@ test('every task served works out to its answer', () => {
   // another few percent as "3*-1*3+20"; 1.0 gets none of them wrong.
   for (const brackets of [false, true]) {
     for (let i = 0; i < 20000; i++) {
-      const { task, answer, quizOptions } = drawSound(mathGen, 2 + (i % 3), { brackets, quizMode: true, seed: i });
+      const { result: { task, answer, quizOptions } } = drawSound(mathGen, 2 + (i % 3), { brackets, quizMode: true, seed: i });
       const text = task.join('');
       assert.equal(evaluate(text), answer, `${text} served as ${answer}`);
       assert.ok(quizOptions.includes(answer));
