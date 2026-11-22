@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import { createApp, readConfig, unbuildableLength } from './app.js';
@@ -7,9 +7,11 @@ import { createApp, readConfig, unbuildableLength } from './app.js';
 // service manager that starts the server from elsewhere reads the same settings.
 const envPath = fileURLToPath(new URL('./.env', import.meta.url));
 const { error: envError } = loadEnv({ path: envPath, quiet: true });
-// A .env that is there but cannot be read would leave every setting at its
-// default without a word, so the server stops instead.
-if (envError && envError.code !== 'ENOENT') {
+// A .env that is there but cannot be read, or is a link to a file that is not,
+// would leave every setting at its default without a word, so the server stops
+// instead.
+const absent = envError?.code === 'ENOENT' && lstatSync(envPath, { throwIfNoEntry: false }) === undefined;
+if (envError && !absent) {
   console.error(`${envError.message}, so the server does not start`);
   process.exit(1);
 }

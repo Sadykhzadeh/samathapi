@@ -146,6 +146,25 @@ test('a .env beside the server saved as UTF-16 stops the server rather than bein
   }
 });
 
+test('a .env beside the server that links to a file that is not there stops the server rather than using the defaults', { skip: process.platform === 'win32' && 'a file link needs privileges on Windows' }, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
+  try {
+    await copyServer(dir);
+    await symlink(join(dir, 'missing.env'), join(dir, '.env'));
+    const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
+    try {
+      const [code] = await once(server.child, 'exit', { signal: AbortSignal.timeout(10_000) });
+      assert.equal(code, 1);
+      assert.match(server.output.stderr.trim(), /^ENOENT: .*, so the server does not start$/);
+      assert.equal(server.output.stdout, '');
+    } finally {
+      server.child.kill();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test('a port that is already taken is one clear line and exit code 1', async () => {
   const port = await freePort();
   const first = start({ PORT: String(port) });
