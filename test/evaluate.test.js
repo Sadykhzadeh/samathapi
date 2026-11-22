@@ -32,7 +32,13 @@ test('"2--1" and "3*-2" are not tasks a pupil should be shown', () => {
 test('a division that does not come out even is refused', () => {
   assert.ok(Number.isNaN(evaluate('7/2*2')));
   assert.ok(Number.isNaN(evaluate('1/0')));
+  assert.ok(Number.isNaN(evaluate('-7/2')));
   assert.equal(evaluate('-12/4'), -3);
+});
+
+test('a product with zero is zero', () => {
+  assert.equal(evaluate('5*0'), 0);
+  assert.equal(evaluate('0*7+2'), 2);
 });
 
 test('anything else that is not a task is NaN', () => {
