@@ -32,6 +32,13 @@ send, the server stops taking connections, answers the requests it has and
 exits with code 0; one still open after 10 seconds is cut and the exit code
 is 1. A second signal cuts the ones still open at once, with the same code.
 
+npm does not pass a signal on to the server it starts. A `SIGTERM` or `SIGINT`
+sent to npm, as `docker stop` sends to a container whose command is `npm start`,
+ends npm but not the server: the server is not drained, and in a container it is
+killed when npm, which is process 1, exits. Ctrl-C reaches the server, since the
+terminal signals the whole group. Where a process manager or a container stops
+the process, run `node .` instead.
+
 `npm test` runs the endpoint tests with Node's built-in runner; there is
 nothing extra to install.
 
