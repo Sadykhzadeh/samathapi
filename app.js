@@ -600,9 +600,11 @@ const ALLOWED = 'GET, HEAD, OPTIONS';
 // those of the bodies, which are at most about 13 000 each.
 export const CACHE_BYTES = 4 * 2 ** 20;
 
-// What an entry takes on the heap beyond its strings: the object, its map slot
-// and the headers of its strings, measured at a little over 100 bytes each.
-const ENTRY_OVERHEAD = 128;
+// What an entry takes on the heap beyond the characters of its strings: the
+// headers of the strings, the objects that hold them and the map slot, with
+// the room a map keeps free as it grows. Measured at about 300 bytes for a
+// short answer.
+const ENTRY_OVERHEAD = 320;
 
 // What a seeded answer costs the cache: its key, its body and tag, and the
 // compressed body once there is one. Counting the body alone let a flood of

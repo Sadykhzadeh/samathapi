@@ -1,5 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import v8 from 'node:v8';
 import vm from 'node:vm';
 import { CACHE_BYTES, createApp, readConfig } from '../app.js';
@@ -131,17 +132,30 @@ test('a seed asked for again is not drawn again, and says the same', async () =>
   }
 });
 
-test('a flood of tiny seeded answers is not kept past the cache bytes, keys and tags included', async () => {
+test('a flood of tiny seeded answers is not kept past the cache bytes, keys, tags and map slots included', async () => {
   const app = await countingApp();
+  // The client's own sockets and buffers take a few megabytes of heap, which
+  // a fetch client adds to what the cache holds, so this one asks over an agent.
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 100 });
+  const get = (path) => new Promise((resolve, reject) => {
+    http.get(`${app.base}${path}`, { agent }, (res) => {
+      res.resume();
+      res.on('end', resolve);
+    }).on('error', reject);
+  });
   try {
-    await fetch(`${app.base}/gen?c=true&seed=1`);
+    const before = (await settledMemory()).heapUsed;
+    await get('/gen?c=true&seed=1');
     for (let seed = 2; seed <= 30000; seed += 100) {
-      await Promise.all(Array.from({ length: 100 }, (_, i) => fetch(`${app.base}/gen?c=true&seed=${seed + i}`).then((res) => res.arrayBuffer())));
+      await Promise.all(Array.from({ length: 100 }, (_, i) => get(`/gen?c=true&seed=${seed + i}`)));
     }
     const drawn = app.state.calls;
-    await fetch(`${app.base}/gen?c=true&seed=1`);
+    await get('/gen?c=true&seed=1');
     assert.equal(app.state.calls, drawn + 1, 'seed 1 is drawn again after 30 000 others');
+    const held = (await settledMemory()).heapUsed - before;
+    assert.ok(held < 1.5 * CACHE_BYTES, `${(held / 2 ** 20).toFixed(1)} MB of heap held for a ${CACHE_BYTES / 2 ** 20} MB cache`);
   } finally {
+    agent.destroy();
     app.server.close();
   }
 });
@@ -209,24 +223,24 @@ test('an entry as big as the whole cache is kept, and one a byte bigger is not',
 // Memory a test can read once the garbage is gone. The buffers of a response
 // read just before a collection are only released once the event loop has
 // run, so a single collection can still count tens of megabytes of them.
-const settledArrayBuffers = async () => {
+const settledMemory = async () => {
   v8.setFlagsFromString('--expose-gc');
   const gc = vm.runInNewContext('gc');
   for (let i = 0; i < 3; i++) {
     await new Promise((resolve) => setImmediate(resolve));
     gc();
   }
-  return process.memoryUsage().arrayBuffers;
+  return process.memoryUsage();
 };
 
 test('the compressed copies of seeded answers take no more memory than the cache is charged for them', async () => {
-  const before = await settledArrayBuffers();
+  const before = (await settledMemory()).arrayBuffers;
   const app = await listen(createApp(readConfig({})));
   try {
     for (let seed = 0; seed < 6000; seed += 50) {
       await Promise.all(Array.from({ length: 50 }, (_, i) => fetch(`${app.base}/gen?count=20&seed=${seed + i}`).then((res) => res.arrayBuffer())));
     }
-    const held = (await settledArrayBuffers()) - before;
+    const held = (await settledMemory()).arrayBuffers - before;
     assert.ok(held < 3 * CACHE_BYTES, `${(held / 2 ** 20).toFixed(1)} MB of buffers held for a ${CACHE_BYTES / 2 ** 20} MB cache`);
   } finally {
     app.server.close();
