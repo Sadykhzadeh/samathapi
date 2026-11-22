@@ -86,3 +86,85 @@ test('every step of the working is the answer, and the last one is written as th
     for (const step of steps) assert.equal(evaluate(step), answer, step);
   }
 });
+
+// Reads the text by the rules evaluate() follows, with a stack of operators and
+// BigInt values, so that the check does not reuse evaluate() itself.
+const reference = (text, negatives) => {
+  if (!/^[-+*/()0-9]+$/.test(text)) return null;
+  const tokens = text.match(/[0-9]+|[-+*/()]/g);
+  const rank = { '+': 1, '-': 1, '*': 2, '/': 2 };
+  const out = [];
+  const ops = [];
+  let prev = 'start';
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (/^[0-9]/.test(token)) {
+      if (prev === 'number' || prev === 'close') return null;
+      out.push(BigInt(token));
+      prev = 'number';
+    } else if (token === '-' && (prev === 'start' || prev === 'open') && /^[0-9]/.test(tokens[i + 1] ?? '')) {
+      if (!negatives) return null;
+      out.push(-BigInt(tokens[++i]));
+      prev = 'number';
+    } else if (token === '(') {
+      if (prev === 'number' || prev === 'close') return null;
+      ops.push(token);
+      prev = 'open';
+    } else if (token === ')') {
+      if (prev !== 'number' && prev !== 'close') return null;
+      while (ops.length && ops.at(-1) !== '(') out.push(ops.pop());
+      if (ops.pop() !== '(') return null;
+      prev = 'close';
+    } else {
+      if (prev !== 'number' && prev !== 'close') return null;
+      while (ops.length && ops.at(-1) !== '(' && rank[ops.at(-1)] >= rank[token]) out.push(ops.pop());
+      ops.push(token);
+      prev = 'operator';
+    }
+  }
+  if (prev !== 'number' && prev !== 'close') return null;
+  while (ops.length) {
+    const op = ops.pop();
+    if (op === '(') return null;
+    out.push(op);
+  }
+  const stack = [];
+  for (const item of out) {
+    if (typeof item === 'bigint') {
+      stack.push(item);
+      continue;
+    }
+    const right = stack.pop();
+    const left = stack.pop();
+    let value;
+    if (item === '+') value = left + right;
+    else if (item === '-') value = left - right;
+    else if (item === '*') value = left * right;
+    else {
+      if (right === 0n || left % right !== 0n) return null;
+      value = left / right;
+    }
+    if (!negatives && value < 0n) return null;
+    stack.push(value);
+  }
+  return stack.length === 1 ? Number(stack[0]) : null;
+};
+
+test('evaluate agrees with a plain integer reference on seeded text, valid or not', () => {
+  const pieces = ['0', '1', '2', '3', '5', '9', '10', '12', '(', ')', '+', '-', '*', '/'];
+  let seed = 20261122;
+  const next = () => {
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+    return seed / 2 ** 32;
+  };
+  for (let i = 0; i < 20000; i++) {
+    let text = '';
+    const length = 1 + Math.floor(next() * 9);
+    for (let k = 0; k < length; k++) text += pieces[Math.floor(next() * pieces.length)];
+    for (const negatives of [true, false]) {
+      const got = evaluate(text, { negatives });
+      // -0 and 0 are the same answer, which a strict comparison would tell apart.
+      assert.equal(Number.isNaN(got) ? null : got + 0, reference(text, negatives), `${JSON.stringify(text)} negatives=${negatives}`);
+    }
+  }
+});
