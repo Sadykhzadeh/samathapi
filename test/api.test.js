@@ -1110,6 +1110,17 @@ test('OPTIONS is a 204 that lists the methods', async () => {
   assert.equal(res.headers.get('allow'), 'GET, HEAD, OPTIONS');
 });
 
+test('OPTIONS * is a 204 that lists the methods of the server', async () => {
+  const { port } = server.address();
+  const socket = net.connect(port, '127.0.0.1');
+  await once(socket, 'connect');
+  socket.end('OPTIONS * HTTP/1.1\r\nHost: example.test\r\nConnection: close\r\n\r\n');
+  let reply = '';
+  for await (const chunk of socket) reply += chunk;
+  assert.match(reply, /^HTTP\/1\.1 204 No Content\r\n/);
+  assert.match(reply, /\r\nAllow: GET, HEAD, OPTIONS\r\n/);
+});
+
 test('a response says how long it is and does not name the framework', async () => {
   const res = await fetch(`${base}/gen?count=5`);
   const body = await res.text();

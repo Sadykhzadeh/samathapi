@@ -827,7 +827,11 @@ export const createApp = (config, generate = mathGen, timeouts = {}) => {
     let path = pathOf(req.url).toLowerCase();
     if (path.length > 1 && path.endsWith('/')) path = path.slice(0, -1);
     const route = routes.get(path);
-    if (!route) {
+    if (req.method === 'OPTIONS' && req.url === '*') {
+      // The asterisk form asks about the server as a whole rather than a path.
+      res.writeHead(204, { Allow: ALLOWED, ...EVERY_ANSWER });
+      res.end();
+    } else if (!route) {
       send(res, 404, JSON_TYPE, '{"error":"not found"}');
     } else if (req.method === 'GET' || req.method === 'HEAD') {
       route(req, res);
