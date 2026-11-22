@@ -208,12 +208,30 @@ test('every response the spec documents is given, with the type and the headers 
   assert.match(res.headers.get('content-type'), /^application\/json/);
   assert.deepEqual(Object.keys(await json(res)), spec.components.schemas.Error.required);
 
-  // A 500 needs a generator that fails, which no input here causes.
+  res = await fetch(`${base}/nope`);
+  assert.equal(res.status, 404);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  assert.deepEqual(Object.keys(await json(res)), spec.components.schemas.Error.required);
+
+  res = await fetch(`${base}/gen`, { method: 'POST' });
+  assert.equal(res.status, 405);
+  assert.match(res.headers.get('content-type'), /^application\/json/);
+  assert.ok(res.headers.get('allow'), 'a 405 names the methods the path takes');
+  assert.deepEqual(Object.keys(await json(res)), spec.components.schemas.Error.required);
+  for (const [path, item] of Object.entries(spec.paths)) {
+    for (const operation of Object.values(item)) {
+      assert.ok(operation.responses[404], `${path} documents its 404`);
+      assert.ok(operation.responses[405], `${path} documents its 405`);
+    }
+  }
+
+  // A 500 needs a generator that fails, which no input here causes. A 404 and a 405 are
+  // documented on every path, and the two checks above stand for them.
   const documented = [];
   for (const [path, item] of Object.entries(spec.paths)) {
     for (const [method, operation] of Object.entries(item)) {
       for (const code of Object.keys(operation.responses)) {
-        if (code !== '500') documented.push(`${path} ${method.toUpperCase()} ${code}`);
+        if (!['404', '405', '500'].includes(code)) documented.push(`${path} ${method.toUpperCase()} ${code}`);
       }
     }
   }

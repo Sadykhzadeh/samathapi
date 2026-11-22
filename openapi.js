@@ -16,6 +16,15 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
     },
   });
 
+  const refused = {
+    404: { description: 'The path is not one this server serves', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+    405: {
+      description: 'A method other than GET, HEAD and OPTIONS',
+      headers: { Allow: { description: 'The methods the path takes', schema: { type: 'string' } } },
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
+    },
+  };
+
   return {
     openapi: '3.0.3',
     info: {
@@ -27,7 +36,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
       '/': {
         get: {
           summary: 'Greeting',
-          responses: { 200: { description: 'Hello World', content: { 'text/plain': { schema: { type: 'string' } } } } },
+          responses: { 200: { description: 'Hello World', content: { 'text/plain': { schema: { type: 'string' } } } }, ...refused },
         },
       },
       '/healthz': {
@@ -46,6 +55,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
                 },
               },
             },
+            ...refused,
           },
         },
       },
@@ -59,6 +69,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
               content: { 'application/json': { schema: { type: 'object' } } },
             },
             304: { description: 'The If-None-Match tag is current' },
+            ...refused,
           },
         },
       },
@@ -164,6 +175,7 @@ export const buildSpec = ({ version, lengthMin, lengthMax, countMax, seedMax, op
             304: { description: 'The If-None-Match tag of a seeded answer is current' },
             400: error('A parameter is wrong, misspelt or sent twice, or no task can be built from the parameters together; the message names each one and what was sent, or gives the reason the generator gave'),
             500: error('A task could not be generated'),
+            ...refused,
           },
         },
       },
