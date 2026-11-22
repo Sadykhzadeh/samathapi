@@ -93,7 +93,7 @@ test('a .env saved on Windows, with a byte order mark and CRLF line endings, is 
   const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
   try {
     await copyServer(dir);
-    await writeFile(join(dir, '.env'), `﻿PORT=${port}\r\nlengthFrom=6\r\nlengthTo=6\r\n`);
+    await writeFile(join(dir, '.env'), `\uFEFFPORT=${port}\r\nlengthFrom=6\r\nlengthTo=6\r\n`);
     const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
     try {
       await server.listening;
@@ -131,7 +131,7 @@ test('a .env beside the server saved as UTF-16 stops the server rather than bein
   const dir = await mkdtemp(join(tmpdir(), 'samathapi-'));
   try {
     await copyServer(dir);
-    await writeFile(join(dir, '.env'), Buffer.from('﻿PORT=3000\r\n', 'utf16le'));
+    await writeFile(join(dir, '.env'), Buffer.from('\uFEFFPORT=3000\r\n', 'utf16le'));
     const server = start({}, { entry: join(dir, 'index.js'), cwd: tmpdir() });
     try {
       const [code] = await once(server.child, 'exit', { signal: AbortSignal.timeout(10_000) });
