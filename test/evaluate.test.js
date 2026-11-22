@@ -41,6 +41,13 @@ test('a product with zero is zero', () => {
   assert.equal(evaluate('0*7+2'), 2);
 });
 
+test('a number or a step past the safe integers is refused, not worked out wrongly', () => {
+  assert.equal(evaluate('9007199254740991'), 9007199254740991);
+  for (const text of ['9007199254740993', '99999999*99999999', '999999*999999*999999']) {
+    assert.ok(Number.isNaN(evaluate(text)), text);
+  }
+});
+
 test('anything else that is not a task is NaN', () => {
   for (const text of ['', '2+', '(1', '1)', '2 + 2', '2^3', 'x', '1+(2', '3(4)']) {
     assert.ok(Number.isNaN(evaluate(text)), JSON.stringify(text));

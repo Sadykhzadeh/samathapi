@@ -1,3 +1,7 @@
+// Past 2^53 a number cannot be told apart from its neighbours, so a number or a
+// step that goes beyond it is refused rather than worked out wrongly.
+const exact = (value) => (Number.isSafeInteger(value) ? value : NaN);
+
 // Works a task out the way a pupil would: integers only, * and / before
 // + and -, left to right, brackets first. Returns NaN for anything that is
 // not such a task, including a division that does not come out even - a
@@ -15,7 +19,7 @@ export const evaluate = (text, { negatives = true } = {}) => {
   const number = () => {
     const start = at;
     while (at < text.length && text[at] >= '0' && text[at] <= '9') at++;
-    return at > start ? Number(text.slice(start, at)) : NaN;
+    return at > start ? exact(Number(text.slice(start, at))) : NaN;
   };
 
   const atom = () => {
@@ -41,7 +45,7 @@ export const evaluate = (text, { negatives = true } = {}) => {
     while (text[at] === '*' || text[at] === '/') {
       const operator = text[at++];
       const right = atom();
-      if (operator === '*') value *= right;
+      if (operator === '*') value = exact(value * right);
       else if (right === 0 || value % right !== 0) return NaN;
       else value /= right;
     }
@@ -53,7 +57,7 @@ export const evaluate = (text, { negatives = true } = {}) => {
     while (text[at] === '+' || text[at] === '-') {
       const operator = text[at++];
       const right = product();
-      value = operator === '+' ? value + right : value - right;
+      value = exact(operator === '+' ? value + right : value - right);
       if (!negatives && value < 0) return NaN;
     }
     return value;
